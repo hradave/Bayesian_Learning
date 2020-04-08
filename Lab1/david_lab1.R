@@ -86,7 +86,7 @@ equal_tail = quantile(G, probs = c(0.05, 0.95)) #0.1606429, 0.3368407
 densx = density(G)$x
 densy = density(G)$y
 sorted = cbind(seq(1,length(densy)), sort(densy, decreasing = T))
-plot(sorted)
+plot(sorted, type = 'l')
 total_area = auc(sorted[,1], sorted[,2])
 
 area = 0
@@ -112,7 +112,7 @@ abline(v = hdi, lwd = 1, col = "green")
 legend(x = "topright", legend=c("equal tail 90%","HPD analytical 90%", "HPD package 90%"),
        col = c("blue", "red", "green"), lwd = 1)
 
-# normalize PDF by dividing it by the area under the curve
+# normalize PDF by dividing it by the area under the curve (general comment)
 
 
 
@@ -120,30 +120,41 @@ legend(x = "topright", legend=c("equal tail 90%","HPD analytical 90%", "HPD pack
 ####################################### 3 #######################################
 
 
-
-
-
-
 #a
+y = c(40, 303, 326, 285, 296, 314, 20, 308, 299, 296)
+y_rad = c(-2.44, 2.14, 2.54, 1.83, 2.02, 2.33, -2.79, 2.23, 2.07, 2.02)
+mu = 2.39
+k = seq(0.01,5,by = 0.01)
 
+# posterior_k = numeric()
+# counter = 1
+# for (current_k in k) {
+#   posterior_k[counter] = 1 / ((2*pi*besselI(current_k, nu = 0))^10) * 
+#                 exp(current_k * (sum(cos(y_rad-mu))-1))
+#   counter = counter + 1
+#   
+# }
+# plot(density(posterior_k))
 
+posterior_k = 1 / ((2*pi*besselI(k, nu = 0))^10) * 
+  exp(k * (sum(cos(y_rad-mu))-1))
 
-
-
-
-
+plot(k,posterior_k, type = 'l', main = 'Posterior of k')
 
 #b
+k[which.max(posterior_k)] #2.12
 
 
 
 
 
-
-
-
-
-
-
-
-
+# # test
+# k = 4
+# ytest = seq(-pi,pi,by=0.1)
+# test = exp(k * (cos(ytest-pi))) / (2*pi*besselI(k, nu = 0))
+#   
+# plot(ytest,test)
+# 
+# xnorm = seq(1,2,by=0.01)
+# pn = 1/(0.0741^2 * sqrt(2*pi)) * exp(-1*(1/(2*0.0741^2))*(xnorm-1.512)^2)
+# plot(xnorm, pn)
