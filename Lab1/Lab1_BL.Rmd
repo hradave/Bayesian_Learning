@@ -319,18 +319,9 @@ mu = 2.39
 Let $\kappa\sim Exponential(\lambda=1)$ we can compute the posterior of $\kappa$ like this,
 
 $$
-p(\kappa|y,\mu)= p(\kappa)\cdot p(y|\mu,\kappa)=\frac{exp[\kappa \cdot cos(y-\mu)]}{2\pi I_0(\kappa)}\cdot \lambda exp(-\lambda \kappa)
-=\frac{exp[\kappa \cdot cos(y-\mu)-1]}{2\pi I_0(\kappa)}.
-$$
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-I THINK THIS IS THE POSTERIOR (DAVID):
-$$
 p(\kappa|y,\mu)= p(\kappa)\cdot p(y|\mu,\kappa)=\lambda exp(-\lambda \kappa)\cdot \frac{exp[\kappa \cdot \sum_i^n cos(y_i-\mu)]}{(2\pi I_0(\kappa))^n}
 =\frac{exp[\kappa \cdot (\sum_i^n(cos(y_i-\mu))-1)]}{(2\pi I_0(\kappa))^n}.
 $$
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 Once we have the posterior distribution, we plot it for different values of $\kappa$. In Figure \ref{fig:k_posterior} we can see the posterior distribution of $\kappa$ that is centered around 2 and slightly right skewed. 
 
