@@ -58,6 +58,9 @@ Once we have the posterior we can draw random samples from it. We draw samples w
 
 # (a) 
 
+# Seed
+set.seed(1234567890)
+
 draw_values <- seq(from=0, to=20000, by=250)
 mean_values <- numeric(length(draw_values))
 sd_values <- numeric(length(draw_values))
@@ -93,14 +96,17 @@ In Figure \ref{fig:posterior_mean} we can see that with a small number of sample
 
 #b
 
+# Seed
+set.seed(1234567890)
+
 nDraws = 10000
 posterior_draw = rbeta(n = nDraws, shape1 = alpha_0 + s, shape2 = beta_0 + f)
-larger_than_03_sim = sum(posterior_draw > 0.3) / length(posterior_draw) #0.4432
+larger_than_03_sim = sum(posterior_draw > 0.3) / length(posterior_draw) #0.4333
 larger_than_03_true = 1 - pbeta(q = 0.3, shape1 = alpha_0 + s, shape2 = beta_0 + f) #0.4399472
 ```
 
 
-We can compute the probability of $\theta > 0.3$ using the drawn sample and compare it to the exact number computed using \texttt{pbeta()}. The value obtained from the sample is $0.4432$ and the exact probability is $0.4399472$ - see code in Appendix. We can conclude that with this sample size both probabilities are very similar. 
+We can compute the probability of $\theta > 0.3$ using the drawn sample and compare it to the exact number computed using \texttt{pbeta()}. The value obtained from the sample is $0.4333$ and the exact probability is $0.4399472$ - see code in Appendix. We can conclude that with this sample size both probabilities are very similar. 
 
 
 ### (c)
@@ -165,6 +171,10 @@ Therefore, in Figure \ref{fig:inv-Chi-sim} we can see the distribution of the si
 #a 
 
 # simulate from posterior for sigma^2
+
+# Seed
+set.seed(1234567890)
+
 X = rchisq(nDraws,n)
 sigma2_sim = n*tau2/X
 hist(sigma2_sim, freq = F, ylim=c(0,6.5), breaks=30, xlim=c(0,1.5), 
@@ -176,6 +186,9 @@ lines(density(sigma2_sim), col="red", lwd=2)
 ```{r density theoretical inv-Chi-squared, fig.cap="\\label{fig:inv-Chi-theo} Density distribution of the Theoretical Inv-Chi-squared.", out.width = "80%", fig.pos='!h', fig.align='center'}
 
 # theoretical posterior for sigma^2?
+
+# Seed
+set.seed(1234567890)
 
 sigma_posterior_draw = rinvchisq(n = nDraws, df = n, scale = tau2)
 hist(sigma_posterior_draw, freq = F, ylim=c(0,6.5), xlim=c(0,1.5), breaks = 30,
@@ -195,7 +208,7 @@ $$
 G=2\phi\left(\frac{\sigma}{\sqrt{2}}\right) -1,
 $$
 
-we then plot the result in Figure \ref{fig:Gini}. From the plot we conclude that the Gini coefficient is closer to 0 than to 1, therefore the income of the people in the sample is more equal than not. 
+we then plot the result in Figure \ref{fig:Gini}. From the plot we conclude that the Gini coefficient is closer to 0 than to 1, therefore the income of the people in the sample are close to being equal.
 ```{r Gini, fig.cap="\\label{fig:Gini} Posterior distribution of the Gini coefficient.", out.width = "80%", fig.pos='!h', fig.align='center'}
 
 #b
@@ -209,48 +222,75 @@ lines(density(G), col="red", lwd=2)
 ```
 
 ### (c)
+Now we use the posterior draws from b) to compute a 90% equal tail credible interval and a 90% Highest Posterior Density interval for G.
 
+For the equal tail interval, we cut of 5% of the probability mass on each side using the \texttt{quantile()} function.
+We calculate the HPD interval by estimating the kernel density with the \texttt{density()} function. We sort the y values in descending order and calculate the area under the curve in a while loop, where we gradually increase the interval until the ratio of the current area and the total area reaches 0.9. Then we have a cut-off value, which we compare to the unsorted y values to find the x values on both sides of the distribution. These two are the interval limits.
+We also use the package \texttt{HDInterval} to check our results.
 ```{r Credible intervals for Gini, echo=FALSE, include=FALSE}
 #c
 
 #90% equal tail
-equal_tail = quantile(G, probs = c(0.05, 0.95)) #0.1606429, 0.3368407
+equal_tail = quantile(G, probs = c(0.05, 0.95)) #0.1599018, 0.3373707
 
 #HPD
 densx = density(G)$x
 densy = density(G)$y
-sorted = cbind(seq(1,length(densy)), sort(densy, decreasing = T))
+# sort the density values (y) in descending order and add an id column
+sorted = cbind(seq(1,length(densy)), sort(densy, decreasing = T)) 
 plot(sorted, type = 'l')
-total_area = auc(sorted[,1], sorted[,2])
+total_area = auc(sorted[,1], sorted[,2]) # calculate the total area under the sorted curve
 
 area = 0
 i = 1
 while (area/total_area < 0.9) {
-  area = auc(sorted[1:(i+1),1], sorted[1:(i+1),2])
+  # calculate the area under the curve of the current data
+  area = auc(sorted[1:(i+1),1], sorted[1:(i+1),2]) 
   i = i+1
 }
 
-cutoff = sorted[(i-1),2] # 1.773939 (subtract 1, because of the last unwanted loop iteration)
-# the closest G-s from both tails from densx are 0.14747841, 0.31634166
-HPD = c(0.14747841,0.31634166)
+cutoff = sorted[(i-1),2] # 1.743313 (subtract 1, because of the last unwanted loop iteration)
+#cbind(density(G)$x, density(G)$y) # find the x values closest to cutoff on both sides
+# the closest G-s from both tails from densx are 0.14638598, 0.31624232
+HPD = c(0.14638598,0.31624232)
 
 # alternative using package HDInterval
-hdi(G, credMass = 0.9) #0.1513655, 0.3413572
-hdi = c(0.1513655, 0.3413572)
+hdi(G, credMass = 0.9) #0.1498581, 0.3170765
+hdi = c(0.1498581, 0.3170765)
 ```
+
 
 ```{r kernel, fig.cap="\\label{fig:Kernel} Comparison of equal tail credible intervals and highest posterior density intervals.", out.width = "80%", fig.pos='!h', fig.align='center'}
 
 # plot of intervals
-plot(density(G), main = "Kernel density estimate of G")
-abline(v = equal_tail, lwd = 1, col = "blue")
-abline(v = HPD, lwd = 1, col = "red")
-abline(v = hdi, lwd = 1, col = "green")
-legend(x = "topright", legend=c("equal tail 90%","HPD analytical 90%", "HPD package 90%"),
-       col = c("blue", "red", "green"), lwd = 1)
+plot(density(G), main = "Kernel density estimates of G")
+abline(v = equal_tail, lwd = 2, col = "blue")
+abline(v = HPD, lwd = 2, col = "red")
+abline(v = hdi, lwd = 2, col = "green")
+legend(x = "topright", legend=c("Equal Tail Int. 90%",
+                                "HPD Int. (Analytical) 90%", 
+                                "HPD Int. (Package) 90%"),
+       col = c("blue", "red", "green"), lwd = 2)
 ```
 
-In Figure \ref{fig:Kernel} we can see bla bla 
+In Figure \ref{fig:Kernel} we can see the kernel density estimates of G and its 90% intervals. The intervals are as follows:
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{| c| c | }
+\hline
+Type & $90\%$ Interval \\
+\hline
+Equal Tail & $(0.1599, 0.3373) $ \\
+HPD Interval (Analytical) & $(0.1464, 0.3162)$ \\
+HPD Interval (Package) & $(0.1499, 0.3171) $ \\
+\hline
+\end{tabular}
+\caption{\textit{The 90\% intervals for G.}}
+\label{tab:ci}
+\end{table}
+
+We can observe that the Equal Tail interval cuts the density curve at different heights, and it is lower on the right side of the mode. This is because of the skewedness of the distribution, which means that there is more probability mass on one  side than on the other. The HPD interval by definition has to cut the density curve at the same height on both sides, hence it is a bit more to the left compared to the Equal Tail interval. There does not seem to be a significant difference between our implementation and the function imported from the packege \texttt{HDInterval}.
 
 \pagebreak
 
@@ -262,7 +302,7 @@ $$
 p(y|\mu,\kappa)=\frac{exp[\kappa \cdot cos(y-\mu)]}{2\pi I_0(\kappa)},
 $$
 
-where $I_0(\kappa)$ is the modified Bessel function, $\mu$ is the mean direction and $\kappa$ is called the concentration parameter. 
+where $I_0(\kappa)$ is the modified Bessel function of the first kind of order zero, $\mu$ is the mean direction and $\kappa$ is called the concentration parameter. 
 
 ```{r #3 parameters}
 
@@ -270,6 +310,7 @@ where $I_0(\kappa)$ is the modified Bessel function, $\mu$ is the mean direction
 
 y = c(40, 303, 326, 285, 296, 314, 20, 308, 299, 296)
 y_rad = c(-2.44, 2.14, 2.54, 1.83, 2.02, 2.33, -2.79, 2.23, 2.07, 2.02)
+n = length(y_rad)
 mu = 2.39
 ```
 
@@ -281,6 +322,15 @@ $$
 p(\kappa|y,\mu)= p(\kappa)\cdot p(y|\mu,\kappa)=\frac{exp[\kappa \cdot cos(y-\mu)]}{2\pi I_0(\kappa)}\cdot \lambda exp(-\lambda \kappa)
 =\frac{exp[\kappa \cdot cos(y-\mu)-1]}{2\pi I_0(\kappa)}.
 $$
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+I THINK THIS IS THE POSTERIOR (DAVID):
+$$
+p(\kappa|y,\mu)= p(\kappa)\cdot p(y|\mu,\kappa)=\lambda exp(-\lambda \kappa)\cdot \frac{exp[\kappa \cdot \sum_i^n cos(y_i-\mu)]}{(2\pi I_0(\kappa))^n}
+=\frac{exp[\kappa \cdot (\sum_i^n(cos(y_i-\mu))-1)]}{(2\pi I_0(\kappa))^n}.
+$$
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 Once we have the posterior distribution, we plot it for different values of $\kappa$. In Figure \ref{fig:k_posterior} we can see the posterior distribution of $\kappa$ that is centered around 2 and slightly right skewed. 
 
@@ -288,9 +338,9 @@ Once we have the posterior distribution, we plot it for different values of $\ka
 
 
 #a
-k = seq(0.01,5,by = 0.01)
+k = seq(0.01,7,by = 0.01)
 
-posterior_k = 1 / ((2*pi*besselI(k, nu = 0))^10) * 
+posterior_k = 1 / ((2*pi*besselI(k, nu = 0))^n) * 
   exp(k * (sum(cos(y_rad-mu))-1))
 
 plot(k,posterior_k, type = 'l', main = 'Posterior of k', xlab="K values", ylab="Posterior")
