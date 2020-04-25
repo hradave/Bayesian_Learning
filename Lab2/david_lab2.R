@@ -101,7 +101,11 @@ lines(density(pred))
 
 # 2.c
 
+# Sum of Bernoulli RVs is Binomial distribution
 
+# probability of success (working)
+p = mean(pred)
 
-
+binom_sim = rbinom(10000, 10, p)
+hist(binom_sim, freq = F)
 
