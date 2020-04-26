@@ -1,0 +1,58 @@
+---
+title: '732A73: Bayesian Learning'
+author: "Oriol Garrobé, Dávid Hrabovszki"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  pdf_document: default
+  html_document: default
+subtitle: Computer Lab 2
+header-includes: \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, eval=TRUE)
+```
+
+```{r warning = FALSE, include=FALSE}
+# R version
+RNGversion('3.5.1')
+
+# libraries
+library("mvtnorm")
+```
+
+# Question 1. Linear and polynomial regression.
+
+Given the dataset \texttt{TempLinkoping.txt} containing:
+* Temp: Response variable with daily average of temperatures in Linkoping over 2018.
+* Time: Covariate of Temp computed as
+
+$$
+time=\frac{number\ of\ days\ since\ beginning\ of\ the\ year}{365}
+$$
+
+We are asked to perform Bayesian analysis of a quadratic regression
+
+$$
+temp=\beta_0 + \beta_1 \cdot time + \beta_2 \cdot time^2 + \epsilon, \epsilon \sim N(0,\sigma^2).
+$$
+
+
+### (a)
+```{r}
+############################################################
+###### Question 1. Linear and polynomial regression  #######
+############################################################
+
+### (a)
+
+# Initial prior hyperparameters
+mu_0 <- c(-10,100,-100)
+omega_0 <- 0.1*diag(3)
+nu_0 <- 4
+sigma2_0 <- 1
+
+# Linear regerssion
+
+```
+
