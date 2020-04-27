@@ -73,11 +73,11 @@ draw_sigma2 <- function(N_draws, nu, sigma2){
   sigma2 <- nu*sigma2/rchisq(N_draws, nu)
 }
 
-draw_betas <- function(sigma2_draws, mu, omega){
-  draw_beta <- matrix(0, nrow=length(sigma2_draws), ncol=3 )
+draw_betas <- function(sigma2_draws, mu, omega, order=3){
+  draw_beta <- matrix(0, nrow=length(sigma2_draws), ncol=order )
   for (sigma in sigma2_draws) {
     i <- which(sigma2_draws==sigma)
-    draw_beta[i,] <- rmvnorm(1, mu, sigma*omega)
+    draw_beta[i,] <- rmvnorm(1, mu, sigma*solve(omega))
   }
   return(draw_beta)
 }
@@ -138,11 +138,14 @@ plot_regression_draws(X, betas_3, time)
 
 # Conjugate posterior
 
+N_draws = 1000
+mu_0<-mu_1
+
 # Hyperparameters
 
 beta_hat <- solve(t(X)%*%X)%*%t(X)%*%y
 mu_n <- solve(t(X)%*%X + omega_0) %*% (t(X)%*%X%*%beta_hat + omega_0%*%mu_0)
-omega_n <- t(X) %*% X + omega_0
+omega_n <- t(X)%*%X + omega_0
 nu_n <- nu_0 + n
 nu_sigma2_n <- nu_0*sigma2_0 + (t(y)%*%y + t(mu_0)%*%omega_0%*%mu_0 - t(mu_n)%*%omega_n%*%mu_n)
 sigma2_n <- nu_sigma2_n[1] / nu_n
@@ -202,15 +205,14 @@ points(time, intervals[,3], lwd=1, col='red', type='l')
 ### (c)
 
 ```{r}
-x_tilda <- -posterior_beta[2]/(2*posterior_beta[3]) #0.5453696
+x_tilda <- -posterior_betas[,2]/(2*posterior_betas[,3]) #0.5453696
+hist(x_tilda, freq=F, breaks=20, col="grey")
 ```
+
 
 ### (d)
 
-```{r}
-
-```
-
+Here we say that higher values that may not be neede, with a prior with mean=0 the problem of overfitting is solved. 
 
 
 \pagebreak
