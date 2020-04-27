@@ -26,7 +26,7 @@ library(knitr)
 
 Given the dataset \texttt{TempLinkoping.txt} containing:
 * Temp: Response variable with daily average of temperatures in Linkoping over 2018.
-* Time: Covariate of Temp computed as
+* Time: Covariate of Temp, computed as
 
 $$
 time=\frac{number\ of\ days\ since\ beginning\ of\ the\ year}{365}
@@ -37,15 +37,10 @@ We are asked to perform Bayesian analysis of a quadratic regression
 $$
 temp=\beta_0 + \beta_1 \cdot time + \beta_2 \cdot time^2 + \epsilon, \epsilon \sim N(0,\sigma^2).
 $$
-
-
-### (a)
 ```{r}
 ############################################################
 #####  Question 1. Linear and polynomial regression  #######
 ############################################################
-
-### (a)
 
 data <- read.table("TempLinkoping.txt", header = TRUE)
 
@@ -60,53 +55,80 @@ mu_0 <- c(-10,100,-100)
 omega_0 <- 0.1*diag(3)
 nu_0 <- 4
 sigma2_0 <- 1
+```
+
+
+
+
+### (a)
+
+
+```{r}
+
+### (a)
 
 # Conjugate prior
-compute_betas <- function(N_draws, mu_0, omega_0, nu_0, sigma2_0){
-  draw_sigma2 <- nu_0*sigma2_0/rchisq(Ndraws, nu_0)
-  draw_beta <- matrix(0, nrow=length(draw_sigma2), ncol=3 )
-  for (sigma in draw_sigma2) {
-    i <- which(draw_sigma2==sigma)
-    draw_beta[i,] <- rmvnorm(1, mu_0, sigma*omega_0)
-  }
-  return(colMeans(draw_beta))
+
+draw_sigma2 <- function(N_draws, nu, sigma2){
+  sigma2 <- nu*sigma2/rchisq(N_draws, nu)
 }
 
-Ndraws=1000
+draw_betas <- function(sigma2_draws, mu, omega){
+  draw_beta <- matrix(0, nrow=length(sigma2_draws), ncol=3 )
+  for (sigma in sigma2_draws) {
+    i <- which(sigma2_draws==sigma)
+    draw_beta[i,] <- rmvnorm(1, mu, sigma*omega)
+  }
+  return(draw_beta)
+}
 
-# Tune hyperparameters
-
-# Initial hyperparameters
-beta_0 <- compute_betas(Ndraws, mu_0, omega_0, nu_0, sigma2_0)
-
-# 1st iteration
-mu_1 <- c(-5,90,-90)
-beta_1 <- compute_betas(Ndraws, mu_1, omega_0, nu_0, sigma2_0)
-
-# 2nd iteration
-mu_2 <- c(0,100,-100)
-beta_2 <- compute_betas(Ndraws, mu_2, omega_0, nu_0, sigma2_0)
-
-# 3rd iteration
-mu_3 <- c(0,85,-85)
-beta_3 <- compute_betas(Ndraws, mu_3, omega_0, nu_0, sigma2_0)
-
-# 4th iteration
-mu_4 <- c(-5, 85, -85)
-beta_4 <- compute_betas(Ndraws, mu_4, omega_0, nu_0, sigma2_0)
-
-mu_0 <- mu_1
+plot_regression_draws <- function(X, betas, time){
+  for (i in 1:length(betas[,1])) {
+    if (i==1) plot(time, X%*%betas[i,], type = 'l', ylim=c(-15, 25), main = 'Temperature over time', ylab='temperature')
+    else points(time, X%*%betas[i,], type='l')
+    points(time,X%*%colMeans(betas),type = 'l',lwd=2,col='yellow')
+  }
+}
 ```
 
 
 ```{r}
-plot(time, X %*% beta_0, type = 'l', lwd=2, col='red', ylim=c(-10, 25),
-     ylab='Temperature', xlab='Time')
-points(time, X %*% beta_1, lwd=2, col='blue', type='l')
-points(time, X %*% beta_2, lwd=2, col='pink', type='l')
-points(time, X %*% beta_3, lwd=2, col='green', type='l')
-points(time, X %*% beta_4, lwd=2, col='yellow', type='l')
+
+N_draws <- 1000
+
+# Initial draw
+sigma2_0_draws <- draw_sigma2(N_draws, nu_0, sigma2_0)
+betas_0 <- draw_betas(sigma2_0_draws, mu_0, omega_0)
+plot_regression_draws(X, betas_0, time)
 ```
+
+```{r}
+
+# 1st iteration
+nu_1 <- 8
+sigma2_1 <- 1.5
+sigma2_1_draws <- draw_sigma2(N_draws, nu_1, sigma2_1)
+betas_1 <- draw_betas(sigma2_1_draws, mu_0, omega_0)
+plot_regression_draws(X, betas_1, time)
+```
+
+
+```{r}
+
+# 2nd iteration
+omega_2 <- 0.5*diag(3)
+betas_2 <- draw_betas(sigma2_0_draws, mu_0, omega_2)
+plot_regression_draws(X, betas_2, time)
+```
+
+```{r}
+
+# 3rd iteration
+mu_3 <- mu_1 <- c(-5,90,-90)
+betas_3 <- draw_betas(sigma2_0_draws, mu_3, omega_0)
+plot_regression_draws(X, betas_3, time)
+```
+
 
 ### (b)
 
@@ -121,46 +143,59 @@ points(time, X %*% beta_4, lwd=2, col='yellow', type='l')
 beta_hat <- solve(t(X)%*%X)%*%t(X)%*%y
 mu_n <- solve(t(X)%*%X + omega_0) %*% (t(X)%*%X%*%beta_hat + omega_0%*%mu_0)
 omega_n <- t(X) %*% X + omega_0
-nu_n <- nu_0 + n # what is n?????????????????????
-nu_sigma2_n <- nu_0*sigma2_0+(t(y)%*%y + t(mu_0)%*%omega_0%*%mu_0 - t(mu_n)%*%omega_n%*%mu_n)
+nu_n <- nu_0 + n
+nu_sigma2_n <- nu_0*sigma2_0 + (t(y)%*%y + t(mu_0)%*%omega_0%*%mu_0 - t(mu_n)%*%omega_n%*%mu_n)
 sigma2_n <- nu_sigma2_n[1] / nu_n
 
-draw_sigma2 <- nu_n*sigma2_n/rchisq(Ndraws, nu_n)
-draw_beta <- matrix(0, nrow=length(draw_sigma2), ncol=3 )
-for (sigma in draw_sigma2) {
-  i <- which(draw_sigma2==sigma)
-  draw_beta[i,] <- rmvnorm(1, mu_n, sigma*omega_n)
-}
+posterior_sigma2 <- draw_sigma2(N_draws, nu_n, sigma2_n)
+posterior_betas <- draw_betas(posterior_sigma2, mu_n, omega_n)
+
 ```
 
 ```{r}
 
 # Sigma
-hist(draw_sigma2, freq = F, breaks=20, main="Sigma", col = 'grey', xlab='Sigma values')
+hist(posterior_sigma2, freq = F, breaks=20, main="Sigma", col = 'grey', xlab='Sigma values')
 ```
 
 ```{r}
 
 #Beta 1
-hist(draw_beta[,1], freq = F, breaks=20, main="Beta 1", col="grey", xlab="Beta values")
+hist(posterior_betas[,1], freq = F, breaks=20, main="Beta 1", col="grey", xlab="Beta values")
 ```
 
 ```{r}
 
 #Beta 2
-hist(draw_beta[,2], freq = F, breaks=20, main="Beta 2", col="grey", xlab="Beta values")
+hist(posterior_betas[,2], freq = F, breaks=20, main="Beta 2", col="grey", xlab="Beta values")
 ```
 
 ```{r}
 
 #Beta 3
-hist(draw_beta[,3], freq=F, breaks=20, main="Beta 3", col="grey", xlab="Beta values")
+hist(posterior_betas[,3], freq=F, breaks=20, main="Beta 3", col="grey", xlab="Beta values")
 ```
 
 ```{r}
-posterior_beta <- colMeans(draw_beta)
+
+predicted_values <- matrix(0, nrow = n, ncol = N_draws)
+for (i in 1:N_draws) {
+  predicted_values[,i] <- X%*%posterior_betas[i,]
+}
+
+intervals <- matrix(0, nrow = n, ncol = 3)
+for (j in 1:n) {
+  intervals[j,]<-c(median(predicted_values[j,]), quantile(predicted_values[j,], probs = c(0.025, 0.975)))
+}
+```
+
+
+```{r}
+
 plot(time, y)
-points(time, X %*% posterior_beta, lwd=2, col='yellow', type='l')
+points(time, intervals[,1], lwd=2, col='yellow', type='l')
+points(time, intervals[,2], lwd=1, col='red', type='l')
+points(time, intervals[,3], lwd=1, col='red', type='l')
 ```
 
 

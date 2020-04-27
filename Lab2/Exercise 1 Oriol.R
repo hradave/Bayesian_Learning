@@ -16,18 +16,31 @@ omega_0 <- 0.1*diag(3)
 nu_0 <- 4
 sigma2_0 <- 1
 
+N_draws=1000
+
 # Conjugate prior
-compute_betas <- function(N_draws, mu_0, omega_0, nu_0, sigma2_0){
-  draw_sigma2 <- nu_0*sigma2_0/rchisq(Ndraws, nu_0)
-  draw_beta <- matrix(0, nrow=length(draw_sigma2), ncol=3 )
-  for (sigma in draw_sigma2) {
-    i <- which(draw_sigma2==sigma)
-    draw_beta[i,] <- rmvnorm(1, mu_0, sigma*omega_0)
-  }
-  return(colMeans(draw_beta))
+
+draw_sigma2 <- function(N_draws, nu, sigma2){
+  sigma2 <- nu*sigma2/rchisq(Ndraws, nu)
 }
 
-Ndraws=1000
+draw_betas <- function(sigma2_draws, mu, omega){
+  draw_beta <- matrix(0, nrow=length(sigma2_draws), ncol=3 )
+  for (sigma in sigma2_draws) {
+    i <- which(sigma2_draws==sigma)
+    draw_beta[i,] <- rmvnorm(1, mu, sigma*omega)
+  }
+  return(draw_beta)
+}
+
+plot_regression_draws <- function(X, betas, time){
+  for (i in 1:length(betas[,1])) {
+    if (i==1) plot(time, X%*%betas[i,], type = 'l', ylim=c(-15, 25), main = 'Temperature over time', ylab='temperature')
+    else points(time, X%*%betas[i,], type='l')
+    points(time,X%*%colMeans(betas),type = 'l',lwd=2,col='yellow')
+  }
+}
+
 
 # Tune hyperparameters
 
