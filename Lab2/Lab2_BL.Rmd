@@ -3,8 +3,12 @@ title: '732A73: Bayesian Learning'
 author: "Oriol Garrobé, Dávid Hrabovszki"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
-  pdf_document: default
-  html_document: default
+  pdf_document:
+    fig_caption: yes
+    includes:
+      in_header: my_header.tex
+  html_document:
+    df_print: paged
 subtitle: Computer Lab 2
 header-includes: \usepackage{float}
 ---
@@ -62,6 +66,7 @@ sigma2_0 <- 1
 
 ### (a)
 
+We need to determine the prior distribution of the model parameters. To do so, we are going to set some initial parameters, simulating 1000 draws from the joint prior and compute the regression curve for every draw. Each regression curve is going to be plotted to analyse. From this point, if the result is not satisfactory the hyperparameters will be changed up until the result fits with the prior believ. 
 
 ```{r}
 
@@ -91,8 +96,11 @@ plot_regression_draws <- function(X, betas, time){
 }
 ```
 
+*1st draw*
 
-```{r}
+$\mu_0=[-10,100,-100]; \quad \Omega_0=\bigg(\begin{smallmatrix} 0.1&0&0\\0&0.1&0\\0&0&0.1 \end{smallmatrix}\bigg) \quad \nu_0=4 \quad \sigma_{0}^{2}=1$
+
+```{r I1, fig.cap="\\label{fig:I4} Regression curves for 1st draw.", out.width = "65%", fig.pos='!h', fig.align='center'}
 
 N_draws <- 1000
 
@@ -102,18 +110,25 @@ betas_0 <- draw_betas(sigma2_0_draws, mu_0, omega_0)
 plot_regression_draws(X, betas_0, time)
 ```
 
-```{r}
+*2nd draw*
+
+$\mu_1=[-10,100,-100]; \quad \Omega_1=\bigg(\begin{smallmatrix} 0.1&0&0\\0&0.1&0\\0&0&0.1 \end{smallmatrix}\bigg) \quad \nu_1=4 \quad \sigma_{1}^{2}=0.5$
+
+```{r I2, fig.cap="\\label{fig:I4} Regression curves for 2nd draw.", out.width = "65%", fig.pos='!h', fig.align='center'}
 
 # 1st iteration
-nu_1 <- 8
-sigma2_1 <- 1.5
+nu_1 <- 4
+sigma2_1 <- 0.5
 sigma2_1_draws <- draw_sigma2(N_draws, nu_1, sigma2_1)
 betas_1 <- draw_betas(sigma2_1_draws, mu_0, omega_0)
 plot_regression_draws(X, betas_1, time)
 ```
 
+*3rd draw*
 
-```{r}
+$\mu_3=[-10,100,-100]; \quad \Omega_3=\bigg(\begin{smallmatrix} 0.5&0&0\\0&0.5&0\\0&0&0.5 \end{smallmatrix}\bigg) \quad \nu_3=4 \quad \sigma_{3}^{2}=1$
+
+```{r I3, fig.cap="\\label{fig:I4} Regression curves for 3rd draw.", out.width = "65%", fig.pos='!h', fig.align='center'}
 
 # 2nd iteration
 omega_2 <- 0.5*diag(3)
@@ -121,16 +136,23 @@ betas_2 <- draw_betas(sigma2_0_draws, mu_0, omega_2)
 plot_regression_draws(X, betas_2, time)
 ```
 
-```{r}
+*4th draw*
 
+$\mu_4=[-5,90,-90]; \quad \Omega_4=\bigg(\begin{smallmatrix} 0.5&0&0\\0&0.5&0\\0&0&0.5 \end{smallmatrix}\bigg) \quad \nu_4=4 \quad \sigma_{4}^{2}=1$
+
+```{r I4, fig.cap="\\label{fig:I4} Regression curves for 4th draw.", out.width = "65%", fig.pos='!h', fig.align='center'}
 # 3rd iteration
 mu_3 <- mu_1 <- c(-5,90,-90)
-betas_3 <- draw_betas(sigma2_0_draws, mu_3, omega_0)
+betas_3 <- draw_betas(sigma2_0_draws, mu_3, omega_2)
 plot_regression_draws(X, betas_3, time)
 ```
 
+Looking at the figures above, we decide that the best prior hyperparameter are the ones from the 4th draw. This is due a mean value close to -5 degrees in winter and a little above 15 degrees in summer. This sounds as a reasonable prior for the study. 
+
 
 ### (b)
+
+In order to compute our posterior linear regression we draw samples from the joint posterior and then we plot the results in order to know the distribution of the different parameters. This are the following.
 
 ```{r}
 
@@ -140,6 +162,7 @@ plot_regression_draws(X, betas_3, time)
 
 N_draws = 1000
 mu_0<-mu_1
+omega_0<-omega_2
 
 # Hyperparameters
 
@@ -155,29 +178,38 @@ posterior_betas <- draw_betas(posterior_sigma2, mu_n, omega_n)
 
 ```
 
-```{r}
-
+```{r sigma2_n, fig.cap="\\label{fig:sigma2} Distribution of Sigma squared.", out.width = "80%", fig.pos='!h', fig.align='center'}
 # Sigma
+mean_p_sigma2 <- mean(posterior_sigma2) #26.89073
 hist(posterior_sigma2, freq = F, breaks=20, main="Sigma", col = 'grey', xlab='Sigma values')
 ```
 
-```{r}
+In \ref{fig:sigma2} we see a distribution that resembles a normal centered around $26.89073$.
 
+```{r b1, fig.cap="\\label{fig:beta_1} Distribution of Beta 0.", out.width = "80%", fig.pos='!h', fig.align='center'}
 #Beta 1
-hist(posterior_betas[,1], freq = F, breaks=20, main="Beta 1", col="grey", xlab="Beta values")
+mean_p_betas_1 <- mean(posterior_betas[,1]) #-11.28667
+hist(posterior_betas[,1], freq = F, breaks=20, main="Beta 0", col="grey", xlab="Beta values")
 ```
 
-```{r}
+In \ref{fig:beta_1} we see a distribution that resembles a normal centered around $-11.28667$.
 
+```{r b2, fig.cap="\\label{fig:beta_2} Distribution of Beta 1.", out.width = "80%", fig.pos='!h', fig.align='center'}
 #Beta 2
-hist(posterior_betas[,2], freq = F, breaks=20, main="Beta 2", col="grey", xlab="Beta values")
+mean_p_betas_2 <- mean(posterior_betas[,2]) #100.1229
+hist(posterior_betas[,2], freq = F, breaks=20, main="Beta 1", col="grey", xlab="Beta values")
 ```
 
-```{r}
+In \ref{fig:beta_2} we see a distribution that resembles a normal centered around $100.1229$.
+
+```{r b3, fig.cap="\\label{fig:beta_3} Distribution of Beta 2.", out.width = "80%", fig.pos='!h', fig.align='center'}
 
 #Beta 3
-hist(posterior_betas[,3], freq=F, breaks=20, main="Beta 3", col="grey", xlab="Beta values")
+mean_p_betas_3 <- mean(posterior_betas[,3]) #-92.20804
+hist(posterior_betas[,3], freq=F, breaks=20, main="Beta 2", col="grey", xlab="Beta values")
 ```
+
+In \ref{fig:beta_3} we see a distribution that resembles a normal centered around $-92.20804$.
 
 ```{r}
 
@@ -193,26 +225,48 @@ for (j in 1:n) {
 ```
 
 
-```{r}
+Once we have looked at the distributions of the parameters, we plot the temperature data over time and overlay the median of the posterior regression and the credible intervals. In \ref{fig:regression} we can see the median regression -yellow- and the credible intervals -red-.
 
-plot(time, y)
+```{r CI, fig.cap="\\label{fig:regression} Credible intervals.", out.width = "80%", fig.pos='!h', fig.align='center'}
+plot(time, y, main="Credible Intervals", ylab='temperature')
 points(time, intervals[,1], lwd=2, col='yellow', type='l')
 points(time, intervals[,2], lwd=1, col='red', type='l')
 points(time, intervals[,3], lwd=1, col='red', type='l')
 ```
 
 
+The interval bands do not contain most of the data points and they should not. The credible intervals stand for an interval within which the probability that the unknown parameter lies in it with a particular probability. Therefore, most of the data points are outside the interval. 
+
 ### (c)
 
-```{r}
+In order to compute the highest expected temperature, given that the regression curve is a quadratic, we can do it by deriving \texttt{f(time)} over \texttt{time}. By doing so we get the following equation, where $\widetilde{x}$ stands for time with max temperature.
+
+$$
+\widetilde{x}=\frac{-\beta_1}{2 \cdot \beta_2}.
+$$
+
+From this point, and given the previous draw of betas, we simulate $\widetilde{x}$. The distribution is the following: 
+
+```{r x_tilde, fig.cap="\\label{fig:x_tilde} Time with highest expected temperature.", out.width = "80%", fig.pos='!h', fig.align='center'}
 x_tilda <- -posterior_betas[,2]/(2*posterior_betas[,3]) #0.5453696
-hist(x_tilda, freq=F, breaks=20, col="grey")
+mean_x_tilda <- mean(x_tilda) #0.5429726
+hist(x_tilda, freq=F, breaks=20, col="grey", main="Highest expected temperature", xlab = "time")
 ```
+
+In \ref{fig:x_tilde} we see a distribution that resembles a normal centered around $0.5429726$.
 
 
 ### (d)
 
-Here we say that higher values that may not be neede, with a prior with mean=0 the problem of overfitting is solved. 
+In order to avoid overfitting when estimating polynomial models of high order we can regularize our prior. In this particular case we want to regularize betas as higher order terms may not be needed. To do so, we modify our prior which is the following:
+
+$$
+\beta_i|\sigma^2\sim N \left(\mu,\frac{\sigma^2}{\lambda} \right)
+$$
+
+For those terms of high order that we suspect may not be needed we set $\mu=0$ and we vary the value of $\lambda$ as pleased. Larger values of $\lambda$ give smoother fit, as $\beta$ is closer to $0$. Note: $\Omega_{0}=\lambda I$
+
+In particular, with the given $\sigma_{0}^2$ and $\Omega_0$ from the exercise, the high order polynomial should not over-fit. If it did, we would need to increase the value of $\Omega_0$ to diagonal values closer to $1$.
 
 
 \pagebreak
