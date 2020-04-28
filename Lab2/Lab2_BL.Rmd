@@ -66,7 +66,7 @@ sigma2_0 <- 1
 
 ### (a)
 
-We need to determine the prior distribution of the model parameters. To do so, we are going to set some initial parameters, simulating 1000 draws from the joint prior and compute the regression curve for every draw. Each regression curve is going to be plotted to analyse. From this point, if the result is not satisfactory the hyperparameters will be changed up until the result fits with the prior believ. 
+We need to determine the prior distribution of the model parameters. To do so, we are going to set some initial parameters, simulating 1000 draws from the joint prior and compute the regression curve for every draw. Each regression curve is going to be plotted to analyse. From this point, if the result is not satisfactory the hyperparameters will be changed up until the result fits with the prior belief. 
 
 ```{r}
 
@@ -147,12 +147,12 @@ betas_3 <- draw_betas(sigma2_0_draws, mu_3, omega_2)
 plot_regression_draws(X, betas_3, time)
 ```
 
-Looking at the figures above, we decide that the best prior hyperparameter are the ones from the 4th draw. This is due a mean value close to -5 degrees in winter and a little above 15 degrees in summer. This sounds as a reasonable prior for the study. 
+Looking at the figures above, we decide that the best prior hyperparameter are the ones from the 4th draw. This is due to the mean value being close to -5 degrees in winter and a little above 15 degrees in summer. This sounds like a reasonable prior for the study. 
 
 
 ### (b)
 
-In order to compute our posterior linear regression we draw samples from the joint posterior and then we plot the results in order to know the distribution of the different parameters. This are the following.
+In order to compute our posterior linear regression we draw samples from the joint posterior and then we plot the results in order to know the distribution of the different parameters. These are the following.
 
 ```{r}
 
@@ -184,7 +184,7 @@ mean_p_sigma2 <- mean(posterior_sigma2) #26.89073
 hist(posterior_sigma2, freq = F, breaks=20, main="Sigma", col = 'grey', xlab='Sigma values')
 ```
 
-In \ref{fig:sigma2} we see a distribution that resembles a normal centered around $26.89073$.
+In Figure \ref{fig:sigma2} we see a distribution that resembles a normal distribution centered around $26.89073$.
 
 ```{r b1, fig.cap="\\label{fig:beta_1} Distribution of Beta 0.", out.width = "80%", fig.pos='!h', fig.align='center'}
 #Beta 1
@@ -192,7 +192,7 @@ mean_p_betas_1 <- mean(posterior_betas[,1]) #-11.28667
 hist(posterior_betas[,1], freq = F, breaks=20, main="Beta 0", col="grey", xlab="Beta values")
 ```
 
-In \ref{fig:beta_1} we see a distribution that resembles a normal centered around $-11.28667$.
+In Figure \ref{fig:beta_1} we see a distribution that resembles a normal distribution centered around $-11.28667$.
 
 ```{r b2, fig.cap="\\label{fig:beta_2} Distribution of Beta 1.", out.width = "80%", fig.pos='!h', fig.align='center'}
 #Beta 2
@@ -200,7 +200,7 @@ mean_p_betas_2 <- mean(posterior_betas[,2]) #100.1229
 hist(posterior_betas[,2], freq = F, breaks=20, main="Beta 1", col="grey", xlab="Beta values")
 ```
 
-In \ref{fig:beta_2} we see a distribution that resembles a normal centered around $100.1229$.
+In Figure \ref{fig:beta_2} we see a distribution that resembles a normal distribution centered around $100.1229$.
 
 ```{r b3, fig.cap="\\label{fig:beta_3} Distribution of Beta 2.", out.width = "80%", fig.pos='!h', fig.align='center'}
 
@@ -209,7 +209,7 @@ mean_p_betas_3 <- mean(posterior_betas[,3]) #-92.20804
 hist(posterior_betas[,3], freq=F, breaks=20, main="Beta 2", col="grey", xlab="Beta values")
 ```
 
-In \ref{fig:beta_3} we see a distribution that resembles a normal centered around $-92.20804$.
+In Figure \ref{fig:beta_3} we see a distribution that resembles a normal distribution centered around $-92.20804$.
 
 ```{r}
 
@@ -225,7 +225,7 @@ for (j in 1:n) {
 ```
 
 
-Once we have looked at the distributions of the parameters, we plot the temperature data over time and overlay the median of the posterior regression and the credible intervals. In \ref{fig:regression} we can see the median regression -yellow- and the credible intervals -red-.
+Once we have looked at the distributions of the parameters, we plot the temperature data over time and overlay the median of the posterior regression and the credible intervals. In Figure \ref{fig:regression} we can see the median regression -yellow- and the credible intervals -red-.
 
 ```{r CI, fig.cap="\\label{fig:regression} Credible intervals.", out.width = "80%", fig.pos='!h', fig.align='center'}
 plot(time, y, main="Credible Intervals", ylab='temperature')
@@ -253,7 +253,7 @@ mean_x_tilda <- mean(x_tilda) #0.5429726
 hist(x_tilda, freq=F, breaks=20, col="grey", main="Highest expected temperature", xlab = "time")
 ```
 
-In \ref{fig:x_tilde} we see a distribution that resembles a normal centered around $0.5429726$.
+In Figure \ref{fig:x_tilde} we see a distribution that resembles a normal distribution centered around $0.5429726$.
 
 
 ### (d)
