@@ -277,15 +277,19 @@ The dataset WomenWork.dat contains n = 200 observations (i.e. women) on the foll
 
 Constant, HusbandInc, EducYears, ExpYears, ExpYears2, Age, NSmallChild, NBigChild
 
-### a
+### (a)
 
 We consider the logistic regression
 
-$Pr(y=1|x)=\frac{exp(x^T\beta)}{1+exp(x^T\beta)}$
+$$
+Pr(y=1|x)=\frac{exp(x^T\beta)}{1+exp(x^T\beta)}
+$$
 
 where $y=0$ is the woman does not work and $y=1$ if she does. $X$ is an 8-dimensional vector with the features including the intercept. In this part, we approximate the posterior distribution of the parameter vector $\beta$:
 
-$\beta|y,X\sim N \Big(\tilde{\beta}, J_y^{-1}(\tilde{\beta})\Big)$
+$$
+\beta|y,X\sim N \Big(\tilde{\beta}, J_y^{-1}(\tilde{\beta})\Big)
+$$
 
 $\tilde{\beta}$ is the posterior mode and $J(\tilde{\beta}) = -\frac{\partial^2lnp(\beta|y)}{\partial\beta\partial\beta^T}|_{\beta=\tilde{\beta}}$ is the observed Hessian evaluated at the posterior mode. We use the following prior:
 $\beta\sim N(0,\tau^2I)$, with $\tau = 10$.
@@ -380,7 +384,7 @@ kable(t(as.matrix(glmModel$coefficients))) #roughly the same as Beta_hat
 
 
 
-### b
+### (b)
 
 In this part we simulate from the predictive distribution of the response variable in a logistic regression. More specificially we simulate and plot the predictive distribution for the Work variable for a 40 year old woman, with two children (3 and 9 years old), 8 years of education, 10 years of experience. and a husband with an income of 10. To do this, first we draw random numbers from the multivariate normal distribution, with mean $\tilde{\beta}$ and covariance matrix $J_y^{-1}(\tilde{\beta})$. Since in normal distributions the mean is equal
 to the mode, we can use the result from 2.a. Then we apply our implementation of the logistric regression function defined above to the given woman with every random draw. 
@@ -419,7 +423,7 @@ lines(density(pred))
 ```
 
 
-### c
+### (c)
 
 Now, we consider 10 women which all have the same features as the woman in 2(b). The random variable of whether a woman is working or not follows a Bernoulli distribution, but if we add 10 such random variables, we get a Binomial distribution, with parameters n = 10 and p = p(given woman works). We calculate the probability of working as the mean of the Bernoulli random variables calculated in 2.b.
 
