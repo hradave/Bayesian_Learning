@@ -32,7 +32,7 @@ The data rainfall.dat consist of daily records, from the beginning of 1948 to th
 
 First we analyze the date using a normal model. We assume that the daily precipitation $y_1, ..., y_n$ values are independent normally distributed:
 
-$$y_1, ..., y_n|\mu, \sigma^2 \sim N(\mu, \sigma^2)$$
+$$y_1, ..., y_n|\mu, \sigma^2 \sim \mathcal{N}(\mu, \sigma^2)$$
 
 where $\mu, \sigma^2$ are uknown. The prior distributions for these parameters are:
 
@@ -49,7 +49,7 @@ $$p(\mu, \sigma^2|y_1, ..., y_n)$$.
 
 The full conditional posteriors:
 
-$$\mu|\sigma^2,x \sim N(\mu_n, \tau_n^2)$$
+$$\mu|\sigma^2,x \sim \mathcal{N}(\mu_n, \tau_n^2)$$
 
 $$\sigma^2|\mu, x \sim Inv-\chi^2\bigg(\nu_n,\frac{\nu_0\sigma_0^2 + \sum_{i=1}^n(x_i-\mu)^2}{n+\nu_0}\bigg)$$
 
@@ -164,9 +164,170 @@ hist(gibbsDraws[burn_in_sigma2:length(gibbsDraws[,2]),2], breaks = 40, main = ''
 
 ### (b)
 
-Slightly modified Mattias Villani's code.
+Here we assume that the daily precipitation $y_1, ..., y_n$ follows an iid. 2-component muxture of normals model:
+
+$$p(y_i|\mu, \sigma^2,\pi)=\pi \mathcal{N}(y_i|\mu_1,\sigma_1^2)+(1-\pi)\mathcal{N}(y_i|\mu_2,\sigma_2^2) $$
+where $\mu=(\mu_1,\mu_2)$ and $\sigma^2=(\sigma_1^2,\sigma_2^2)$
+
+We use a slightly modified code from Mattias Villani from the file NormalMixtureGibbs.R to draw Gibbs samples from the mixture model. We set parameters the same way as in part a).
+
+```{r}
+#### 1.b
+
+#mixture model (normals)
+# Code from NormalMixtureGibbs.R (by Mattias Villani)
+
+# Estimating a simple mixture of normals
+# Author: Mattias Villani, IDA, Linkoping University. http://mattiasvillani.com
+
+##########    BEGIN USER INPUT #################
+# Data options
+x <- as.matrix(data$rainfall)
+
+# Model options
+nComp <- 2    # Number of mixture components
+
+# Prior options
+alpha <- 10*rep(1,nComp) # Dirichlet(alpha)
+muPrior <- rep(30,nComp) # Prior mean of mu
+tau2Prior <- rep(100,nComp) # Prior std of mu: high, because we have no prior knowledge
+sigma2_0 <- rep(var(x),nComp) # s20 (best guess of sigma2)
+nu0 <- rep(4,nComp) # degrees of freedom for prior on sigma2: small, because we have no prior knowledge
+
+# MCMC options
+nIter <- 100 # Number of Gibbs sampling draws
+
+# Plotting options
+plotFit <- TRUE
+lineColors <- c("blue", "green", "magenta", 'yellow')
+sleepTime <- 0.1 # Adding sleep time between iterations for plotting
+################   END USER INPUT ###############
+
+###### Defining a function that simulates from the 
+rScaledInvChi2 <- function(n, df, scale){
+  return((df*scale)/rchisq(n,df=df))
+}
+
+####### Defining a function that simulates from a Dirichlet distribution
+rDirichlet <- function(param){
+  nCat <- length(param)
+  piDraws <- matrix(NA,nCat,1)
+  for (j in 1:nCat){
+    piDraws[j] <- rgamma(1,param[j],1)
+  }
+  piDraws = piDraws/sum(piDraws) # Diving every column of piDraws by the sum of the elements in that column.
+  return(piDraws)
+}
+
+# Simple function that converts between two different representations of the mixture allocation
+S2alloc <- function(S){
+  n <- dim(S)[1]
+  alloc <- rep(0,n)
+  for (i in 1:n){
+    alloc[i] <- which(S[i,] == 1)
+  }
+  return(alloc)
+}
+# Seed
+set.seed(1234567890)
+
+# Initial value for the MCMC
+nObs <- length(x)
+S <- t(rmultinom(nObs, size = 1 , prob = rep(1/nComp,nComp))) # nObs-by-nComp matrix with component allocations.
+mu <- quantile(x, probs = seq(0,1,length = nComp))
+sigma2 <- rep(var(x),nComp)
+probObsInComp <- rep(NA, nComp)
+
+# Setting up the plot
+xGrid <- seq(min(x)-1*apply(x,2,sd),max(x)+1*apply(x,2,sd),length = 100)
+xGridMin <- min(xGrid)
+xGridMax <- max(xGrid)
+mixDensMean <- rep(0,length(xGrid))
+effIterCount <- 0
+ylim <- c(0,2*max(hist(x)$density))
+
+
+for (k in 1:nIter){
+  #message(paste('Iteration number:',k))
+  alloc <- S2alloc(S) # Just a function that converts between different representations of the group allocations
+  nAlloc <- colSums(S)
+  #print(nAlloc)
+  # Update components probabilities
+  pi <- rDirichlet(alpha + nAlloc)
+  
+  # Update mu's
+  for (j in 1:nComp){
+    precPrior <- 1/tau2Prior[j]
+    precData <- nAlloc[j]/sigma2[j]
+    precPost <- precPrior + precData
+    wPrior <- precPrior/precPost
+    muPost <- wPrior*muPrior + (1-wPrior)*mean(x[alloc == j])
+    tau2Post <- 1/precPost
+    mu[j] <- rnorm(1, mean = muPost, sd = sqrt(tau2Post))
+  }
+  
+  # Update sigma2's
+  for (j in 1:nComp){
+    sigma2[j] <- rScaledInvChi2(1, df = nu0[j] + nAlloc[j], scale = (nu0[j]*sigma2_0[j] + sum((x[alloc == j] - mu[j])^2))/(nu0[j] + nAlloc[j]))
+  }
+  
+  # Update allocation
+  for (i in 1:nObs){
+    for (j in 1:nComp){
+      probObsInComp[j] <- pi[j]*dnorm(x[i], mean = mu[j], sd = sqrt(sigma2[j]))
+    }
+    S[i,] <- t(rmultinom(1, size = 1 , prob = probObsInComp/sum(probObsInComp)))
+  }
+  
+  # Printing the fitted density against data histogram
+  if (k == nIter) {
+    if (plotFit && (k%%1 ==0)){
+    effIterCount <- effIterCount + 1
+    hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = paste("Iteration number",k), ylim = ylim)
+    mixDens <- rep(0,length(xGrid))
+    components <- c()
+    for (j in 1:nComp){
+      compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
+      mixDens <- mixDens + pi[j]*compDens
+      lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
+      components[j] <- paste("Component ",j)
+    }
+    mixDensMean <- ((effIterCount-1)*mixDensMean + mixDens)/effIterCount
+    
+    lines(xGrid, mixDens, type = "l", lty = 2, lwd = 3, col = 'red')
+    legend("topright", box.lty = 1, legend = c("Data histogram",components, 'Mixture'), 
+    col = c("black",lineColors[1:nComp], 'red'), lwd = 2)
+    #Sys.sleep(sleepTime)
+  }
+  }
+  
+  
+}
+
+# hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
+# lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
+# lines(xGrid, dnorm(xGrid, mean = mean(x), sd = apply(x,2,sd)), type = "l", lwd = 2, col = "blue")
+# legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density"), col=c("black","red","blue"), lwd = 2)
+
+#########################    End of code from Mattias Villani    ##############################################
+```
+
 
 ### (c)
+
+```{r}
+#### c
+
+#histogram of data
+hist(data$rainfall, freq = F, breaks = 30)
+
+#normal density from a)
+norm_gibbs = rnorm(1000, mean = mu_gibbs, sd = sqrt(sigma2_gibbs))
+lines(density(norm_gibbs), col = 'blue', lwd = 2)
+
+#mixture of normals from b)
+lines(xGrid, mixDensMean, type = "l", lwd = 2, col = "red")
+```
 
 
 
