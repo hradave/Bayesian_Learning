@@ -124,6 +124,8 @@ S2alloc <- function(S){
   }
   return(alloc)
 }
+# Seed
+set.seed(1234567890)
 
 # Initial value for the MCMC
 nObs <- length(x)
