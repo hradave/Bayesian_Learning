@@ -2,6 +2,8 @@
 
 RNGversion('3.5.1')
 
+library(mvtnorm)
+
 #### a
 data = read.table('rainfall.dat', col.names = 'rainfall')
 
@@ -220,3 +222,98 @@ lines(density(norm_gibbs), col = 'blue', lwd = 2)
 lines(xGrid, mixDensMean, type = "l", lwd = 2, col = "red")
 
 
+
+
+#################### QUESTION 2 ####################
+
+data2 = read.table('eBayNumberOfBidderData.dat', header = T)
+
+
+#a
+model = glm(nBids ~ . - Const, data = data2, family = 'poisson')
+model$coefficients
+
+#b
+# The following code was written using Mattias Villani's implementation as a template:
+# https://github.com/mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam.zip
+
+
+y = as.vector(data2[,1])
+x = as.matrix(data2[,2:10])
+nfeatures = dim(x)[2]
+
+# prior
+mu = as.vector(rep(0,nfeatures))
+sigma = 100*solve(t(x)%*%x)
+
+LogPrior = function(theta, mu, sigma){
+  return(dmvnorm(theta, as.matrix(mu), sigma, log = T))
+}
+
+# log likelihood
+LogLikelihood = function(theta, y, x){
+  sum(y * x%*%theta - exp(x%*%theta) - log(factorial(y))) #log-likelihood of poisson regression
+}
+
+# log posterior
+LogPosterior = function(theta, y, x, mu, sigma){
+  LogPrior(theta, mu, sigma) + LogLikelihood(theta, y, x) 
+  # we can sum them instead of multiplying, because of the log
+}
+
+# initialize Beta vector randomly
+# Seed
+set.seed(1234567890)
+Beta_init = as.vector(rnorm(dim(x)[2]))
+
+# optimizing the log posterior by changing the Betas (maximize)
+res = optim(Beta_init, LogPosterior, gr = NULL, y, x, mu, sigma, 
+            method="BFGS", control=list(fnscale=-1), hessian=T)
+
+Beta_hat = res$par # posterior mode
+Hessian = res$hessian
+post_sigma = solve(-Hessian) # posterior cov matrix
+stdev = sqrt(diag(post_sigma))
+
+### end of code from Mattias Villani's template
+
+
+#c
+
+RWMSampler = function(logPostFunc, c, iter, initial, proposal_sigma, ...){
+  X = matrix(0,nrow = iter+1, ncol = length(initial))
+  X[1,] = initial
+  
+  #acceptance probability stats
+  alphas = numeric(iter)
+  
+  for (t in 1:iter) {
+    print(t)
+    Y = as.numeric(rmvnorm(1, mean = X[t,], sigma = c * proposal_sigma)) # Proposal needs to be a numeric vector
+    U = runif(1, min = 0, max = 1) # Generate uniform
+    
+    alpha = min(1,
+                (exp(logPostFunc(Y, ...) - logPostFunc(X[t,], ...))))
+    
+    if (U < alpha) {
+      X[t+1,] = Y
+    } else {
+      X[t+1,] = X[t,]
+    }
+    alphas[t] = alpha # save acceptance probability
+    t = t+1
+  }
+  return(list('mcmc' = X, 'alphas' = alphas))
+}
+
+
+# Seed
+set.seed(1234567890)
+mc = RWMSampler(LogPosterior, c = 0.65, iter = 10000, initial = Beta_init, proposal_sigma = post_sigma, y, x, mu, sigma)
+
+for (p in 1:9) {
+  plot(mc$mcmc[,p], type = 'l', main = p)
+  hist(mc$mcmc[1000:10000,p], main = p, breaks = 30)
+}
+
+mean(mc$alphas) #0.27
