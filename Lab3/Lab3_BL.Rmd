@@ -556,7 +556,7 @@ The probability that nobody bids on the coin in this new auction is 35.48%, whic
 
 ```{r, fig.cap="\\label{fig:hist_pred_dist} Histogram of the predicted distribution", out.width = "65%", fig.pos='!h', fig.align='center'}
 
-barplot(values$ratio, names.arg = values$value, xlab = 'Number of bids', ylab = 'Probability density')
+barplot(values$ratio, names.arg = values$value, xlab = 'Number of bids', ylab = 'Probability')
 ```
 
 
