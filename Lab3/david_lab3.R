@@ -309,11 +309,57 @@ RWMSampler = function(logPostFunc, c, iter, initial, proposal_sigma, ...){
 
 # Seed
 set.seed(1234567890)
-mc = RWMSampler(LogPosterior, c = 0.65, iter = 10000, initial = Beta_init, proposal_sigma = post_sigma, y, x, mu, sigma)
+nIter = 10000
+mc = RWMSampler(LogPosterior, c = 0.65, iter = nIter, initial = Beta_init, proposal_sigma = post_sigma, y, x, mu, sigma)
 
 for (p in 1:9) {
   plot(mc$mcmc[,p], type = 'l', main = p)
-  hist(mc$mcmc[1000:10000,p], main = p, breaks = 30)
+}
+
+burn_in_theta = 1000
+
+for (p in 1:9) {
+  hist(mc$mcmc[burn_in_theta:nIter,p], main = p, breaks = 30)
 }
 
 mean(mc$alphas) #0.27
+
+Beta_mcmc = mc$mcmc[burn_in_theta:nIter,]
+
+
+#d
+
+Const = 1
+PowerSeller = 1
+VerifyID = 1
+Sealed = 1
+MinBlem = 0
+MajBlem = 0
+LargNeg = 0
+LogBook = 1
+MinBidShare = 0.5
+x_pred = c(Const, PowerSeller, VerifyID, Sealed, MinBlem, MajBlem, LargNeg, LogBook, MinBidShare)
+
+predictive_dist = numeric(dim(Beta_mcmc)[1])
+# Seed
+set.seed(1234567890)
+for (i in 1:dim(Beta_mcmc)[1]) {
+  predictive_dist[i] = rpois(1, exp(t(as.matrix(x_pred)) %*% as.matrix(Beta_mcmc[i,])))
+}
+hist(predictive_dist, freq = T)
+sum(predictive_dist==0)/length(predictive_dist) #0.3548495
+
+#normalized predictive distribution
+values = unique(predictive_dist)
+values = cbind(values,numeric(length(values)))
+for (v in values[,1]) {
+  count = sum(predictive_dist==v)
+  values[values[,1]==v] = c(v, count)
+}
+
+values = data.frame(values)
+colnames(values) = c('value', 'count')
+values$ratio = values$count/sum(values$count)
+values = values[order(values$value),]
+
+barplot(values$ratio)
