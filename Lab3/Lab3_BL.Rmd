@@ -22,6 +22,8 @@ knitr::opts_chunk$set(echo=FALSE, eval=TRUE)
 RNGversion('3.5.1')
 
 # libraries
+library(knitr)
+library(mvtnorm)
 ```
 
 # Question 1. Normal model, mixture of normal model with semi-conjugate prior
@@ -334,21 +336,228 @@ lines(xGrid, mixDensMean, type = "l", lwd = 2, col = "red")
 
 # Question 2. Metropolis Random Walk for Poisson regression
 
+In this task we consider the following Poisson regression model to analyze the dataset about coin auctions on eBay:
+
+$$y_i|\beta \sim Poisson[exp(x_i^T\beta)], i=1,...,n$$
+
+The response variable ($y$) is the number of bids and there are 8 features and a constant for the intercept ($x$). The dataset consists of 1000 auctions.
 
 ### (a)
 
+To obtain the maximum likelihood estimator of $\beta$, we use the \texttt{glm()} function.
 
+```{r}
+#################### QUESTION 2 ####################
+
+data2 = read.table('eBayNumberOfBidderData.dat', header = T)
+
+
+#2.a
+model = glm(nBids ~ . - Const, data = data2, family = 'poisson')
+summary(model)
+
+```
+
+From the p-values in the summary of the model, we can observe that VerifyID, Sealed, MajBlem, LogBook and MinBidShare covariates are significant at 5% level. We can also see that MinBidShare has the largest influence on the number of bids a coin receives, and that this relationship is negative, meaning that if the minimum selling price is lower than the book value, more people will bid on the coin. The largest positive influence on the number of bids comes from whether the coin is sealed in an unopened envelope (Sealed) or not. Interestingly, the fact that the seller is verified by eBay has a negative effect on the number of bids.
 
 ### (b)
 
+Now we are going to do a Bayesian analysis of the Poisson regression. The prior for $\beta$ is Zellner's g-prior:
+
+$$\mathcal{N}[0,100*(X^TX)^{-1}]$$
+and we assume that the posterior density is approximately multivariate normal:
+
+$$\beta|y \sim \mathcal{N}(\hat{\beta}, J_y^{-1}(\hat{\beta}))$$
+where $\hat{\beta}$ is the posterior mode and $J_y(\hat{\beta})$ is the negative Hessian at the posterior mode, which we obtain from the \texttt{optim()} function. We use a modified version of our code from Lab 2, which used Mattias Villani's code (https://github.com/mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam.zip) as a template.
+
+The probability density function of the Poisson regression model is the following:
+
+$$p(y_i|\beta,x_i) = \frac{exp(x_i^T\beta)^{y_i}*exp(-exp(x_i^T\beta))}{y_i!}$$
+
+Therefore the log-likelihood is:
+
+$$log p(y|\beta,x)=\sum\limits_{i=1}^n\big(y_ix_i\beta - exp(x_i\beta) - log(y_i!)\big)$$
+
+```{r}
+#2.b
+# The following code was written using Mattias Villani's implementation as a template:
+# https://github.com/mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam.zip
+
+y = as.vector(data2[,1])
+x = as.matrix(data2[,2:10])
+nfeatures = dim(x)[2]
+
+# prior
+mu = as.vector(rep(0,nfeatures))
+sigma = 100*solve(t(x)%*%x)
+
+LogPrior = function(theta, mu, sigma){
+  return(dmvnorm(theta, as.matrix(mu), sigma, log = T))
+}
+
+# log likelihood
+LogLikelihood = function(theta, y, x){
+  sum(y * x%*%theta - exp(x%*%theta) - log(factorial(y))) #log-likelihood of poisson regression
+}
+
+# log posterior
+LogPosterior = function(theta, y, x, mu, sigma){
+  LogPrior(theta, mu, sigma) + LogLikelihood(theta, y, x) 
+  # we can sum them instead of multiplying, because of the log
+}
+
+# initialize Beta vector randomly
+# Seed
+set.seed(1234567890)
+Beta_init = as.vector(rnorm(dim(x)[2]))
+
+# optimizing the log posterior by changing the Betas (maximize)
+res = optim(Beta_init, LogPosterior, gr = NULL, y, x, mu, sigma, 
+            method="BFGS", control=list(fnscale=-1), hessian=T)
+
+Beta_hat = res$par # posterior mode
+Hessian = res$hessian
+post_sigma = solve(-Hessian) # posterior cov matrix
+stdev = sqrt(diag(post_sigma))
+
+### end of code from Mattias Villani's template
+
+```
+
+We obtain the following posterior mode (or mean, since it's normal distribution) for $\beta$, and we can observe that it is very similar to the maximum likelihood estimator:
+
+```{r}
+betas = t(as.matrix(round(Beta_hat,4)))
+colnames(betas) = colnames(data2[2:10])
+kable(betas)
+```
 
 
 ### (c)
 
+In this part we use the Metropolis Random Walk algorithm to simulate from the actual posterior of $\beta$. Our implementation can generate draws from any posterior density with a vector of model parameters $\theta$. In this case, the proposal density is multivariate normal:
 
+$$\theta_p|\theta^{(i-1)} \sim \mathcal{N}(\theta^{(i-1)},c*\Sigma)$$
+where $\Sigma = J_y^{-1}(\hat{\beta})$ obtained in part b). We found that $c=0.65$ provides a covariance matrix that results in an average acceptance probability of proposals between 25% and 30%.
+
+```{r warning=FALSE}
+#2.c
+
+RWMSampler = function(logPostFunc, c, iter, initial, proposal_sigma, ...){
+  X = matrix(0,nrow = iter+1, ncol = length(initial)) #returned posterior draws
+  X[1,] = initial
+  
+  #acceptance probability stats
+  alphas = numeric(iter)
+  
+  for (t in 1:iter) {
+    #print(t)
+    Y = as.numeric(rmvnorm(1, mean = X[t,], sigma = c * proposal_sigma)) # Proposal needs to be a numeric vector
+    U = runif(1, min = 0, max = 1) # Generate uniform
+    
+    alpha = min(1,
+                (exp(logPostFunc(Y, ...) - logPostFunc(X[t,], ...)))) #have to take exp(), because posterior is log
+    
+    if (U < alpha) {
+      X[t+1,] = Y #accept new proposal with probability alpha
+    } else {
+      X[t+1,] = X[t,] #reject new proposal
+    }
+    alphas[t] = alpha # save acceptance probability
+    t = t+1
+  }
+  return(list('mcmc' = X, 'alphas' = alphas))
+}
+
+# Seed
+set.seed(1234567890)
+nIter = 10000
+mc = RWMSampler(LogPosterior, c = 0.65, iter = nIter, initial = Beta_init, proposal_sigma = post_sigma, y, x, mu, sigma) #parameters from 2.b
+```
+
+```{r, fig.cap="\\label{fig:mcmc_betas} Markov chains of the posterior draws of the parameters", out.width = "100%", fig.pos='!h', fig.align='center', fig.height = 10, fig.width = 12}
+par(mfrow=c(3,3))
+for (p in 1:9) {
+  plot(mc$mcmc[,p], type = 'l', ylab = '', xlab = paste('Beta ', p)) #plot mcmc-s for all betas
+}
+```
+
+Figure \ref{fig:mcmc_betas} shows the Markov chains obtained for all $\beta$ parameters. We ran the Metropolis Random Walk algorithm for 10000 iterations to make sure that the chains converge, because the burn-in period is quite large. The convergence is satisfactory based on the plots, so we save the chains after discarding the first 1000 draws of the burn-in period. The average acceptance probability is 27%.
+
+```{r}
+burn_in_theta = 1000
+#mean(mc$alphas) #0.27 average acceptance probability
+
+Beta_mcmc = mc$mcmc[burn_in_theta:nIter,] # discard burn-in period
+```
+ 
+ Calculating the means of the parameters, we obtain the following table:
+ 
+```{r}
+betas_mcmc = t(as.matrix(round(colMeans(Beta_mcmc),4)))
+colnames(betas_mcmc) = colnames(data2[2:10])
+kable(betas_mcmc)
+```
+
+
+This, again is very similar to the appriximate results from 2.b) and the maximum likelihood estimator from 2.a).
 
 ### (d)
 
+Now we use the MCMC draws from 2.c) to simulate from the predictive distribution of the number of bidders in a new auction with the following characteristics:
+
+* PowerSeller = 1
+* VerifyID = 1
+* Sealed = 1
+* MinBlem = 0
+* MajBlem = 0
+* LargNeg = 0
+* LogBook = 1
+* MinBidShare = 0.5
+
+```{r}
+
+#2.d
+Const = 1
+PowerSeller = 1
+VerifyID = 1
+Sealed = 1
+MinBlem = 0
+MajBlem = 0
+LargNeg = 0
+LogBook = 1
+MinBidShare = 0.5
+x_pred = c(Const, PowerSeller, VerifyID, Sealed, MinBlem, MajBlem, LargNeg, LogBook, MinBidShare)
+
+predictive_dist = numeric(dim(Beta_mcmc)[1])
+# Seed
+set.seed(1234567890)
+for (i in 1:dim(Beta_mcmc)[1]) {
+  predictive_dist[i] = rpois(1, exp(t(as.matrix(x_pred)) %*% as.matrix(Beta_mcmc[i,]))) #sample poisson draws using Beta MCMCs
+}
+
+#sum(predictive_dist==0)/length(predictive_dist) #0.3548495
+
+#normalized predictive distribution
+values = unique(predictive_dist)
+values = cbind(values,numeric(length(values)))
+for (v in values[,1]) {
+  count = sum(predictive_dist==v)
+  values[values[,1]==v] = c(v, count)
+}
+
+values = data.frame(values)
+colnames(values) = c('value', 'count')
+values$ratio = values$count/sum(values$count)
+values = values[order(values$value),]
+```
+
+The probability that nobody bids on the coin in this new auction is 35.48%, which we get by dividing the number of predictive draws where the result is 0 by the number of all the draws. Or we can look at the histogram of the normalized predictive distribution in Figure \ref{fig:hist_pred_dist}. The low number of bids is probably because the minimum selling price for the coin was set high compared to its book value (MinBidShare = 0.5).
+
+```{r, fig.cap="\\label{fig:hist_pred_dist} Histogram of the predicted distribution", out.width = "65%", fig.pos='!h', fig.align='center'}
+
+barplot(values$ratio, names.arg = values$value, xlab = 'Number of bids', ylab = 'Probability density')
+```
 
 
 

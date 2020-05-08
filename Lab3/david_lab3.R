@@ -309,7 +309,7 @@ RWMSampler = function(logPostFunc, c, iter, initial, proposal_sigma, ...){
 
 # Seed
 set.seed(1234567890)
-nIter = 10000
+nIter = 100
 mc = RWMSampler(LogPosterior, c = 0.65, iter = nIter, initial = Beta_init, proposal_sigma = post_sigma, y, x, mu, sigma)
 
 for (p in 1:9) {
