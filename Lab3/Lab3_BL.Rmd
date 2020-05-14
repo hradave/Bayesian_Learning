@@ -22,40 +22,572 @@ knitr::opts_chunk$set(echo=FALSE, eval=TRUE)
 RNGversion('3.5.1')
 
 # libraries
+library(knitr)
+library(mvtnorm)
 ```
 
 # Question 1. Normal model, mixture of normal model with semi-conjugate prior
 
-### (a)
+The rainfall data consists of daily records, from the beginning of 1948 to the end of 1983, of precipitation at Snoqualmie Falls, Washington. In this task we analyze this data using two different models.
+
+### (a) Normal model
+
+First we analyze the date using a normal model. We assume that the daily precipitation $y_1, ..., y_n$ values are independent normally distributed:
+
+$$y_1, ..., y_n|\mu, \sigma^2 \sim \mathcal{N}(\mu, \sigma^2)$$
+
+where $\mu, \sigma^2$ are unknown. The prior distributions for these parameters are:
+
+$$\mu \sim \mathcal{N}(\mu_0, \tau_0^2)$$
+
+$$\sigma^2 \sim Inv-\chi^2(\nu_0, \sigma_0^2)$$
 
 
+#### (i)
 
-### (b)
+Now we implement a Gibbs sampler that simulates from the joint posterior distribution:
+
+$$p(\mu, \sigma^2|y_1, ..., y_n)$$.
+
+The full conditional posteriors:
+
+$$\mu|\sigma^2,x \sim \mathcal{N}(\mu_n, \tau_n^2)$$
+
+$$\sigma^2|\mu, x \sim Inv-\chi^2\bigg(\nu_n,\frac{\nu_0\sigma_0^2 + \sum_{i=1}^n(x_i-\mu)^2}{n+\nu_0}\bigg)$$
+
+where $$\mu_n = w\bar{x}+(1-w)\mu_0$$
+
+$$w=\frac{\frac{n}{\sigma^2}}{\frac{n}{\sigma^2}+\frac{1}{\tau_0^2}}$$
+
+$$\frac{1}{\tau_n^2}=\frac{n}{\sigma^2}+\frac{1}{\tau_0^2}$$
+
+We choose the following prior values: $\mu_0 = 30$, from looking at the data, because we had no prior knowledge in the topic. To express our uncertainty about this, we set the variance of the prior mean to a high value: $\tau_0^2=100$. Similarly, we choose $\sigma_0^2 = 1547.103$, which is the variance of the data sample. But then we pick a small prior for the degrees of freedom, because the prior is non-informative: $\nu_0 = 4$.
+
+```{r}
+
+#### 1.a
+data = read.table('rainfall.dat', col.names = 'rainfall')
+
+#### (i)
+
+n = length(data$rainfall)
+avg = mean(data$rainfall)
+
+#prior setup
+mu_0 = 30 #mu prior from prior knowledge, or looking at the data if there is no knowledge
+tau2_0 = 100 #var(mu_0) high, because we have no prior knowledge
+sigma2_0 = var(data$rainfall) # should use var(data$rainfall for best guess)
+nu_0 = 4 #df, small, because we have no prior knowledge
+
+# scaled-inverse chi-square simulator (from lab1 and from NormalMixtureGibbs.R)
+rScaledInvChi2 <- function(n, df, scale){
+  return((df*scale)/rchisq(n,df=df))
+}
+
+# Gibbs sampling
+steps = 1000
+gibbsDraws <- matrix(0,steps+1,2) #1st column: mu, 2nd column: sigma2
+gibbsDraws[1,1] = mu_0
+gibbsDraws[1,2] = sigma2_0
+
+# Seed
+set.seed(1234567890)
+for (i in 1:steps) {
+  #simulate mu from conditional posterior (normal)
+  w = (n/gibbsDraws[i,2])/(n/gibbsDraws[i,2] + 1/tau2_0)
+  mu_n = w * avg + (1-w) * mu_0
+  tau2_n = 1 / (n/gibbsDraws[i,2] + 1/tau2_0)
+  
+  #update mu
+  gibbsDraws[i+1,1] = rnorm(1, mu_n, sqrt(tau2_n))
+  
+  #simulate sigma2 from conditional posterior (inv-chisq)
+  nu_n = nu_0 + n
+  scale = (nu_0 * sigma2_0 + sum((data$rainfall - gibbsDraws[i+1,1])^2)) / (n + nu_0)
+  
+  #update sigma2
+  gibbsDraws[i+1,2] = rScaledInvChi2(1, nu_n, scale)
+}
+```
 
 
+#### (ii)
 
-### (c)
+In this part we analyze the daily precipitation using our Gibbs sampler.
+
+```{r}
+#### (ii)
+#Plot Markov chains and cumulative mean plots
+cum_mean = numeric(steps + 1)
+cum_var = numeric(steps + 1)
+for (i in 1:(steps+1)) {
+  cum_mean[i] = mean(gibbsDraws[1:i,1])
+  cum_var[i] = mean(gibbsDraws[1:i,2])
+}
+```
+
+Figure \ref{fig:mcmc_mean} shows the trajectory of the Markov chain for sampling the mean and the cumulative mean of the mean statistic as the number of iterations grows. We ran the sampler for 1000 iterations, but it seems clear that it converges after a very short time. We ignore the first 10 draws, as this seems to be a burn-in period, where the draws are not inside the distribution. The observed mean from the data is 32.283, while the mean of the draws is 32.285, so this indicates a successful Gibbs sampling. The Markov chain has a highly oscillating shape and the fact that the cumulative mean also converges to 32.284 means that the chain converges. The daily precipitation then has an average of around 32.285, but there is a possibility that it is between 30.9 and 33.6.
+
+```{r, fig.cap="\\label{fig:mcmc_mean} Markov chain of the sampled mean", out.width = "90%", fig.pos='!h', fig.align='center'}
+plot(1:(steps+1), gibbsDraws[,1], type = 'l', xlab = 'iterations', ylab = 'Gibbs draws for mean')
+legend(x='bottomright', legend=c('Traceplot', 'Cumulative mean'), col = c('black', 'blue'), lwd = 2)
+lines(1:(steps+1), cum_mean, col = 'blue', lwd = 5)
+```
+
+Figure \ref{fig:mcmc_var} shows the trajectory of the Markov chain for sampling the variance and the cumulative mean of the variance statistic as the number of iterations grows. We observe that the chain converges a bit more slowly than in the case of the mean, but it does so quite quickly nevertheless. Again, we ignore the burn in period (first 10 draws). The observed variance from the data is 1547.103, while the mean of the draws is 1546.152, so this indicates a successful Gibbs sampling. The Markov chain has a highly oscillating shape and the fact that the cumulative mean of the draws also converges to 1546.149 means that the chain converges. The daily precipitation then has a variance of around 1546.152, but there is a possibility that it is between 1472.2 and 1621.6. The small burn-in period is due to the fact that we chose the prior parameters by looking at the data itself.
+
+```{r, fig.cap="\\label{fig:mcmc_var} Markov chain of the sampled variance", out.width = "90%", fig.pos='!h', fig.align='center'}
+plot(1:(steps+1), gibbsDraws[,2], type = 'l', xlab = 'iterations', ylab = 'Gibbs draws for variance')
+legend(x='bottomright', legend=c('Traceplot', 'Cumulative mean'), col = c('black', 'blue'), lwd = 2)
+lines(1:(steps+1), cum_var, col = 'blue', lwd = 5)
+
+```
+
+```{r}
+# result: mean of all posterior draws
+burn_in_mu = 10
+burn_in_sigma2 = 10
+mu_gibbs = mean(gibbsDraws[burn_in_mu:length(gibbsDraws[,1]),1]) #32.28486
+#max(gibbsDraws[burn_in_mu:length(gibbsDraws[,1]),1]) #33.65197
+#min(gibbsDraws[burn_in_mu:length(gibbsDraws[,1]),1]) #30.91425
+#max(gibbsDraws[burn_in_mu:length(gibbsDraws[,1]),2]) #1621.629
+#min(gibbsDraws[burn_in_mu:length(gibbsDraws[,1]),2]) #1472.211
+sigma2_gibbs = mean(gibbsDraws[burn_in_sigma2:length(gibbsDraws[,2]),2]) #1546.152
+```
+
+Figures \ref{fig:hist_mean} and \ref{fig:hist_var} show that the Gibbs samples for the mean and variance follow normal distributions, which is no surpise, since the priors were normal.
+
+```{r, fig.cap="\\label{fig:hist_mean} Histogram of the sampled mean", out.width = "65%", fig.pos='!h', fig.align='center'}
+
+hist(gibbsDraws[burn_in_mu:length(gibbsDraws[,1]),1], breaks = 30, main = '', 
+     xlab = 'Gibbs draws for mean')
+```
+
+```{r, fig.cap="\\label{fig:hist_var} Histogram of the sampled variance", out.width = "65%", fig.pos='!h', fig.align='center'}
+
+hist(gibbsDraws[burn_in_sigma2:length(gibbsDraws[,2]),2], breaks = 40, main = '', 
+     xlab = 'Gibbs draws for variance')
+
+```
+
+
+### (b) Mixture normal model
+
+Here we assume that the daily precipitation $y_1, ..., y_n$ follows an iid. 2-component mixture of normals model:
+
+$$p(y_i|\mu, \sigma^2,\pi)=\pi \mathcal{N}(y_i|\mu_1,\sigma_1^2)+(1-\pi)\mathcal{N}(y_i|\mu_2,\sigma_2^2) $$
+where $\mu=(\mu_1,\mu_2)$ and $\sigma^2=(\sigma_1^2,\sigma_2^2)$
+
+We use a slightly modified code from Mattias Villani from the file NormalMixtureGibbs.R to draw Gibbs samples from the mixture model. We set the parameters the same way as in part a).
+
+```{r}
+
+#### 1.b
+
+#mixture model (normals)
+# Code from NormalMixtureGibbs.R (by Mattias Villani)
+
+# Estimating a simple mixture of normals
+# Author: Mattias Villani, IDA, Linkoping University. http://mattiasvillani.com
+
+##########    BEGIN USER INPUT #################
+# Data options
+x <- as.matrix(data$rainfall)
+
+# Model options
+nComp <- 2    # Number of mixture components
+
+# Prior options
+alpha <- 10*rep(1,nComp) # Dirichlet(alpha)
+muPrior <- rep(30,nComp) # Prior mean of mu
+tau2Prior <- rep(100,nComp) 
+# Prior std of mu: high, because we have no prior knowledge
+sigma2_0 <- rep(var(x),nComp) # s20 (best guess of sigma2)
+nu0 <- rep(4,nComp) 
+# degrees of freedom for prior on sigma2: small, because we have no prior knowledge
+
+# MCMC options
+nIter <- 100 # Number of Gibbs sampling draws
+
+# Plotting options
+plotFit <- TRUE
+lineColors <- c("blue", "green", "magenta", 'yellow')
+sleepTime <- 0.1 # Adding sleep time between iterations for plotting
+################   END USER INPUT ###############
+
+###### Defining a function that simulates from the 
+rScaledInvChi2 <- function(n, df, scale){
+  return((df*scale)/rchisq(n,df=df))
+}
+
+####### Defining a function that simulates from a Dirichlet distribution
+rDirichlet <- function(param){
+  nCat <- length(param)
+  piDraws <- matrix(NA,nCat,1)
+  for (j in 1:nCat){
+    piDraws[j] <- rgamma(1,param[j],1)
+  }
+  piDraws = piDraws/sum(piDraws) 
+  # Diving every column of piDraws by the sum of the elements in that column.
+  return(piDraws)
+}
+
+# Simple function that converts between two different representations of the mixture allocation
+S2alloc <- function(S){
+  n <- dim(S)[1]
+  alloc <- rep(0,n)
+  for (i in 1:n){
+    alloc[i] <- which(S[i,] == 1)
+  }
+  return(alloc)
+}
+# Seed
+set.seed(1234567890)
+
+# Initial value for the MCMC
+nObs <- length(x)
+S <- t(rmultinom(nObs, size = 1 , prob = rep(1/nComp,nComp))) 
+# nObs-by-nComp matrix with component allocations.
+mu <- quantile(x, probs = seq(0,1,length = nComp))
+sigma2 <- rep(var(x),nComp)
+probObsInComp <- rep(NA, nComp)
+
+# Setting up the plot
+xGrid <- seq(min(x)-1*apply(x,2,sd),max(x)+1*apply(x,2,sd),length = 100)
+xGridMin <- min(xGrid)
+xGridMax <- max(xGrid)
+mixDensMean <- rep(0,length(xGrid))
+effIterCount <- 0
+ylim <- c(0,2*max(hist(x, plot = F)$density))
+
+
+for (k in 1:nIter){
+  #message(paste('Iteration number:',k))
+  alloc <- S2alloc(S) 
+  # Just a function that converts between different representations of the group allocations
+  nAlloc <- colSums(S)
+  #print(nAlloc)
+  # Update components probabilities
+  pi <- rDirichlet(alpha + nAlloc)
+  
+  # Update mu's
+  for (j in 1:nComp){
+    precPrior <- 1/tau2Prior[j]
+    precData <- nAlloc[j]/sigma2[j]
+    precPost <- precPrior + precData
+    wPrior <- precPrior/precPost
+    muPost <- wPrior*muPrior + (1-wPrior)*mean(x[alloc == j])
+    tau2Post <- 1/precPost
+    mu[j] <- rnorm(1, mean = muPost, sd = sqrt(tau2Post))
+  }
+  
+  # Update sigma2's
+  for (j in 1:nComp){
+    sigma2[j] <- rScaledInvChi2(1, df = nu0[j] + nAlloc[j], 
+                                scale = (nu0[j]*sigma2_0[j] + sum((x[alloc == j] - mu[j])^2))
+                                /(nu0[j] + nAlloc[j]))
+  }
+  
+  # Update allocation
+  for (i in 1:nObs){
+    for (j in 1:nComp){
+      probObsInComp[j] <- pi[j]*dnorm(x[i], mean = mu[j], sd = sqrt(sigma2[j]))
+    }
+    S[i,] <- t(rmultinom(1, size = 1 , prob = probObsInComp/sum(probObsInComp)))
+  }
+  
+  # Printing the fitted density against data histogram
+  if (k == nIter) {
+    if (plotFit && (k%%1 ==0)){
+    effIterCount <- effIterCount + 1
+    hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax),
+         main = paste("Iteration number",k), ylim = ylim)
+    mixDens <- rep(0,length(xGrid))
+    components <- c()
+    for (j in 1:nComp){
+      compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
+      mixDens <- mixDens + pi[j]*compDens
+      lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
+      components[j] <- paste("Component ",j)
+    }
+    mixDensMean <- ((effIterCount-1)*mixDensMean + mixDens)/effIterCount
+    
+    lines(xGrid, mixDens, type = "l", lty = 2, lwd = 3, col = 'red')
+    legend("topright", box.lty = 1, legend = c("Data histogram",components, 'Mixture'), 
+    col = c("black",lineColors[1:nComp], 'red'), lwd = 2)
+    #Sys.sleep(sleepTime)
+  }
+  }
+}
+
+# hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
+# lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
+# lines(xGrid, dnorm(xGrid, mean = mean(x), sd = apply(x,2,sd)), type = "l", lwd = 2, col = "blue")
+# legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density"), col=c("black","red","blue"), lwd = 2)
+
+#########################    End of code from Mattias Villani    #######################
+```
+
+The plot above shows the histogram of the data, the 2 normal models and their mixture at the last iteration. Convergence is achieved quite quickly, as the red line does not change a lot after the fist 20-30 iterations. The number of observations belonging to each mixture component also does not change much.
+
+### (c) Graphical comparison
+
+Now we compare the histogram of the data with the density of the normal model from a) and the mixture of normals from b). We use the mean of the Gibbs draws for the mean and variance to sample draws from the distribution. Figure \ref{fig:hist_gibbs} shows that the simple normal density does not manage to cover the true distribution, but the mixture model does a better job. It is still not perfect, as there is an area between the components that is not covered, and the tail is too heavy. Perhaps a non-normal distribution would fit better here. Both models reach into the negative values, too, which is not possible for this rainfall analysis.
+
+```{r, fig.cap="\\label{fig:hist_gibbs} Histogram of the rainfall data and fitted models", out.width = "65%", fig.pos='!h', fig.align='center'}
+
+#### 1.c
+
+#histogram of data
+hist(data$rainfall, freq = F, breaks = 30, main = '', xlab = 'rainfall' )
+
+#normal density from a)
+# Seed
+set.seed(1234567890)
+norm_gibbs = rnorm(1000, mean = mu_gibbs, sd = sqrt(sigma2_gibbs))
+lines(density(norm_gibbs), col = 'blue', lwd = 2)
+
+#mixture of normals from b)
+lines(xGrid, mixDensMean, type = "l", lwd = 2, col = "red")
+
+legend(x='topright', legend=c('Normal density from a)', 'Mixture of normals density from b)'), 
+       col = c('blue', 'red'), lwd = 2)
+```
 
 
 
 
 # Question 2. Metropolis Random Walk for Poisson regression
 
+In this task we consider the following Poisson regression model to analyze the dataset about coin auctions on eBay:
+
+$$y_i|\beta \sim Poisson[exp(x_i^T\beta)], i=1,...,n$$
+
+The response variable ($y$) is the number of bids and there are 8 features and a constant for the intercept ($x$). The dataset consists of 1000 auctions.
 
 ### (a)
 
+To obtain the maximum likelihood estimator of $\beta$, we use the \texttt{glm()} function.
 
+```{r}
+
+
+
+#################### QUESTION 2 ####################
+data2 = read.table('eBayNumberOfBidderData.dat', header = T)
+
+#2.a
+model = glm(nBids ~ . - Const, data = data2, family = 'poisson')
+summary(model)
+
+```
+
+From the p-values in the summary of the model, we can observe that VerifyID, Sealed, MajBlem, LogBook and MinBidShare covariates are significant at 5% level. We can also see that MinBidShare has the largest influence on the number of bids a coin receives, and that this relationship is negative, meaning that if the minimum selling price is small compared to the book value, more people will bid on the coin. The largest positive influence on the number of bids comes from whether the coin is sealed in an unopened envelope (Sealed) or not. Interestingly, the fact that the seller is verified by eBay has a negative effect on the number of bids.
 
 ### (b)
 
+Now we are going to do a Bayesian analysis of the Poisson regression. The prior for $\beta$ is Zellner's g-prior:
+
+$$\mathcal{N}[0,100*(X^TX)^{-1}]$$
+
+
+and we assume that the posterior density is approximately multivariate normal:
+
+$$\beta|y \sim \mathcal{N}(\tilde{\beta}, J_y^{-1}(\tilde{\beta}))$$
+where $\tilde{\beta}$ is the posterior mode and $J_y(\tilde{\beta})$ is the negative Hessian at the posterior mode, which we obtain from the \texttt{optim()} function. We use a modified version of our code from Lab 2, which used Mattias Villani's code (https://github.com/mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam.zip) as a template.
+
+The probability density function of the Poisson regression model is the following:
+
+$$p(y_i|\beta,x_i) = \frac{exp(x_i^T\beta)^{y_i}*exp(-exp(x_i^T\beta))}{y_i!}$$
+
+Therefore the log-likelihood is:
+
+$$log p(y|\beta,x)=\sum\limits_{i=1}^n\big(y_ix_i\beta - exp(x_i\beta) - log(y_i!)\big)$$
+
+```{r}
+#2.b
+# The following code was written using Mattias Villani's implementation as a template:
+# https://github.com/mattiasvillani/BayesLearnCourse/raw/master/Code/MainOptimizeSpam.zip
+
+y = as.vector(data2[,1])
+x = as.matrix(data2[,2:10])
+nfeatures = dim(x)[2]
+
+# prior
+mu = as.vector(rep(0,nfeatures))
+sigma = 100*solve(t(x)%*%x)
+
+LogPrior = function(theta, mu, sigma){
+  return(dmvnorm(theta, as.matrix(mu), sigma, log = T))
+}
+
+# log likelihood
+LogLikelihood = function(theta, y, x){
+  sum(y * x%*%theta - exp(x%*%theta) - log(factorial(y))) #log-likelihood of poisson regression
+}
+
+# log posterior
+LogPosterior = function(theta, y, x, mu, sigma){
+  LogPrior(theta, mu, sigma) + LogLikelihood(theta, y, x) 
+  # we can sum them instead of multiplying, because of the log
+}
+
+# initialize Beta vector randomly
+# Seed
+set.seed(1234567890)
+Beta_init = as.vector(rnorm(dim(x)[2]))
+
+# optimizing the log posterior by changing the Betas (maximize)
+res = optim(Beta_init, LogPosterior, gr = NULL, y, x, mu, sigma, 
+            method="BFGS", control=list(fnscale=-1), hessian=T)
+
+Beta_hat = res$par # posterior mode
+Hessian = res$hessian
+post_sigma = solve(-Hessian) # posterior cov matrix
+stdev = sqrt(diag(post_sigma))
+
+### end of code from Mattias Villani's template
+
+```
+
+We obtain the following posterior mode (or mean, since it's normal distribution) for $\beta$, and we can observe that it is very similar to the maximum likelihood estimator:
+
+```{r}
+betas = t(as.matrix(round(Beta_hat,4)))
+colnames(betas) = colnames(data2[2:10])
+kable(betas)
+```
 
 
 ### (c)
 
+In this part we use the Metropolis Random Walk algorithm to simulate from the actual posterior of $\beta$. Our implementation can generate draws from any posterior density with a vector of model parameters $\theta$. In this case, the proposal density is multivariate normal:
 
+$$\theta_p|\theta^{(i-1)} \sim \mathcal{N}(\theta^{(i-1)},c*\Sigma)$$
+where $\Sigma = J_y^{-1}(\tilde{\beta})$ obtained in part b). We found that $c=0.65$ provides a covariance matrix that results in an average acceptance probability of proposals between 25% and 30%.
+
+```{r warning=FALSE}
+#2.c
+
+RWMSampler = function(logPostFunc, c, iter, initial, proposal_sigma, ...){
+  X = matrix(0,nrow = iter+1, ncol = length(initial)) #returned posterior draws
+  X[1,] = initial
+  
+  #acceptance probability stats
+  alphas = numeric(iter)
+  
+  for (t in 1:iter) {
+    #print(t)
+    Y = as.numeric(rmvnorm(1, mean = X[t,], sigma = c * proposal_sigma)) 
+    # Proposal needs to be a numeric vector
+    U = runif(1, min = 0, max = 1) # Generate uniform
+    
+    alpha = min(1,
+                (exp(logPostFunc(Y, ...) - logPostFunc(X[t,], ...)))) 
+    #have to take exp(), because posterior is log
+    
+    if (U < alpha) {
+      X[t+1,] = Y #accept new proposal with probability alpha
+    } else {
+      X[t+1,] = X[t,] #reject new proposal
+    }
+    alphas[t] = alpha # save acceptance probability
+    t = t+1
+  }
+  return(list('mcmc' = X, 'alphas' = alphas))
+}
+
+# Seed
+set.seed(1234567890)
+nIter = 10000
+mc = RWMSampler(LogPosterior, c = 0.65, iter = nIter, initial = Beta_init,
+                proposal_sigma = post_sigma, y, x, mu, sigma) #parameters from 2.b
+```
+
+```{r, fig.cap="\\label{fig:mcmc_betas} Markov chains of the posterior draws of the parameters", out.width = "100%", fig.pos='!h', fig.align='center', fig.height = 10, fig.width = 12}
+par(mfrow=c(3,3))
+for (p in 1:9) {
+  plot(mc$mcmc[,p], type = 'l', ylab = '', xlab = colnames(data2)[1+p]) #plot mcmc-s for all betas
+}
+```
+
+Figure \ref{fig:mcmc_betas} shows the Markov chains obtained for all $\beta$ parameters. We ran the Metropolis Random Walk algorithm for 10000 iterations to make sure that the chains converge, because the burn-in period is quite large. The convergence is satisfactory based on the plots, so we save the chains after discarding the first 1000 draws of the burn-in period. The average acceptance probability is 27%.
+
+```{r}
+burn_in_theta = 1000
+#mean(mc$alphas) #0.27 average acceptance probability
+
+Beta_mcmc = mc$mcmc[burn_in_theta:nIter,] # discard burn-in period
+```
+ 
+ Calculating the means of the parameters, we obtain the following table:
+ 
+```{r}
+betas_mcmc = t(as.matrix(round(colMeans(Beta_mcmc),4)))
+colnames(betas_mcmc) = colnames(data2[2:10])
+kable(betas_mcmc)
+```
+
+
+This, again is very similar to the appriximate results from 2.b) and the maximum likelihood estimator from 2.a).
 
 ### (d)
 
+Now we use the MCMC draws from 2.c) to simulate from the predictive distribution of the number of bidders in a new auction with the following characteristics:
+
+* PowerSeller = 1
+* VerifyID = 1
+* Sealed = 1
+* MinBlem = 0
+* MajBlem = 0
+* LargNeg = 0
+* LogBook = 1
+* MinBidShare = 0.5
+
+```{r}
+
+#2.d
+Const = 1
+PowerSeller = 1
+VerifyID = 1
+Sealed = 1
+MinBlem = 0
+MajBlem = 0
+LargNeg = 0
+LogBook = 1
+MinBidShare = 0.5
+x_pred = c(Const, PowerSeller, VerifyID, Sealed, MinBlem, MajBlem, LargNeg, LogBook, MinBidShare)
+
+predictive_dist = numeric(dim(Beta_mcmc)[1])
+# Seed
+set.seed(1234567890)
+for (i in 1:dim(Beta_mcmc)[1]) {
+  predictive_dist[i] = rpois(1, exp(t(as.matrix(x_pred)) %*% as.matrix(Beta_mcmc[i,]))) 
+  #sample poisson draws using Beta MCMCs
+}
+
+#sum(predictive_dist==0)/length(predictive_dist) #0.3548495
+
+#normalized predictive distribution
+values = unique(predictive_dist)
+values = cbind(values,numeric(length(values)))
+for (v in values[,1]) {
+  count = sum(predictive_dist==v)
+  values[values[,1]==v] = c(v, count)
+}
+
+values = data.frame(values)
+colnames(values) = c('value', 'count')
+values$ratio = values$count/sum(values$count)
+values = values[order(values$value),]
+```
+
+The probability that nobody bids on the coin in this new auction is 35.48%, which we get by dividing the number of predictive draws where the result is 0 by the number of all the draws. Or we can look at the normalized predictive distribution in Figure \ref{fig:pred_dist}. The low number of bids is probably because the minimum selling price for the coin was set high compared to its book value (MinBidShare = 0.5).
+
+```{r, fig.cap="\\label{fig:pred_dist} Predictive distribution", out.width = "65%", fig.pos='!h', fig.align='center'}
+
+barplot(values$ratio, names.arg = values$value, xlab = 'Number of bids', ylab = 'Probability')
+```
 
 
 
