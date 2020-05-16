@@ -63,9 +63,9 @@ parameters {
   real<lower=0> sigma;
 }
 model {
-  mu ~ normal(10,10);
-  // phi ~ uniform(-1,1); // Setting the limit of beta (or phi)
-  // sigma ~ uniform(0,100);
+  mu ~ normal(10,2);
+  phi ~ normal(0.95,2); // Setting the limit of beta (or phi)
+  sigma ~ normal(1.4,2);
   for (n in 2:N)
     y[n] ~ normal(mu+phi*(y[n-1]-mu),sigma);
 }'
@@ -94,31 +94,31 @@ pairs(fit)
 #i
 
 #posterior means:
-#alpha = 0.43
-#beta = 0.96
+#mu = 9.95
+#phi = 0.96
 #sigma = 1.29
 
 #95% credible intervals:
-#alpha = [-0.06, 0.92]
-c(0.43 - 1.96 * 0.25, 0.43 + 1.96 * 0.25)
-#beta = [0.9208, 0.9992]
+#mu = [6.99, 12.91]
+c(9.95 - 1.96 * 1.51, 9.95 + 1.96 * 1.51)
+#phi = [0.9208, 0.9992]
 c(0.96 - 1.96 * 0.02, 0.96 + 1.96 * 0.02)
 #sigma = [1.1528, 1.4370]
 c(1.29 - 1.96 * 0.07, 1.29 + 1.96 * 0.075)
 
 #effective posterior samples
-#alpha = 1775
-#beta = 1774
-#sigma = 1965
+#mu = 2799
+#phi = 2663
+#sigma = 3497
 
 #YES, WE CAN ESTIMATE THE TRUE VALUES
 
 #ii
 traceplot(fit) #good mixing, good convergence, because all 4 chains arrive to the same conclusion
 
-plot(postDraws$alpha,type="l",ylab="mu",main="Traceplot")
+plot(postDraws$mu,type="l",ylab="mu",main="Traceplot")
 plot(postDraws$sigma,type="l",ylab="mu",main="Traceplot")
-hist(postDraws$alpha, breaks = 30)
+hist(postDraws$mu, breaks = 30)
 hist(postDraws$sigma, breaks = 30)
 
 # run only if permuted = FALSE in extract()
@@ -131,12 +131,66 @@ plot(postDraws[,4,1], type = 'l')
 
 
 #### c
-data = read.table('campy.dat', header = T)
+data_campy = read.table('campy.dat', header = T)
+plot(x=c(1:140), y=data_campy$c, type = 'l')
+
+StanModel_poisson = '
+data {
+  int<lower=0> N;
+  int<lower=0> y[N];
+}
+parameters {
+  real mu;
+  real phi;
+  real<lower=0> sigma;
+  real x[N];
+}
+model {
+  mu ~ normal(11,2);
+  phi ~ normal(0,10); // Setting the limit of beta (or phi)
+  sigma ~ normal(7,2);
+  for (n in 2:N){
+    x[n] ~ normal(mu+phi*(x[n-1]-mu),sigma);
+    y[n] ~ poisson(exp(x[n]));
+  }
+}'
+
+N = length(data_campy$c)
+data = list(N=N, y=data_campy$c)
+burnin = 1000
+niter = 20000
+fit_poisson = stan(model_code = StanModel_poisson, data = data, warmup = burnin, iter = niter, chains = 4)
+
+# Print the fitted model
+print(fit_poisson)
+# Extract posterior samples
+postDraws <- extract(fit_poisson)
+# Do traceplots of the first chain
+par(mfrow = c(1,1))
+plot(postDraws$mu[1:(niter-burnin)],type="l",ylab="mu",main="Traceplot")
+# Do automatic traceplots of all chains
+traceplot(fit_poisson)
+# Bivariate posterior plots
+pairs(fit_poisson)
 
 
 
 
 #### d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
