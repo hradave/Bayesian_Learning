@@ -1,0 +1,58 @@
+---
+title: '732A73: Bayesian Learning'
+author: "Oriol Garrobé, Dávid Hrabovszki"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  pdf_document:
+    fig_caption: yes
+    includes:
+      in_header: my_header.tex
+  html_document:
+    df_print: paged
+subtitle: Computer Lab 4
+header-includes: \usepackage{float}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, eval=TRUE)
+```
+
+```{r warning = FALSE, include=FALSE}
+# R version
+RNGversion('3.5.1')
+
+# libraries
+
+
+# Seed
+set.seed(1234567890)
+```
+
+# Question 1. Time series models in Stan
+
+### a
+
+
+
+### b
+
+
+
+### c
+
+
+
+### d
+
+
+
+\pagebreak
+
+# Appendix
+
+```{r ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+
+```
+
+
+
