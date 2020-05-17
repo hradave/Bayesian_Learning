@@ -36,9 +36,11 @@ set.seed(1234567890)
 x1 = sim_AR_1(mu, mu, sigma2, -1, t)
 plot(x1, type = 'l')
 
+set.seed(1234567890)
 x2 = sim_AR_1(mu, mu, sigma2, 0, t)
 plot(x2, type = 'l')
 
+set.seed(1234567890)
 x3 = sim_AR_1(mu, mu, sigma2, 1, t)
 plot(x3, type = 'l')
 
@@ -177,6 +179,8 @@ pairs(fit_poisson)
 
 
 #### d
+
+
 
 
 

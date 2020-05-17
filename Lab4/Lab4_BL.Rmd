@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo=FALSE, eval=TRUE)
 RNGversion('3.5.1')
 
 # libraries
-
+library(rstan)
 
 # Seed
 set.seed(1234567890)
@@ -30,19 +30,89 @@ set.seed(1234567890)
 
 # Question 1. Time series models in Stan
 
-### a
+### (a)
+We are asked to develop a simulator from the AR(1)-process,
+$$
+x_t=\mu+\phi(x_{t-1}-\mu)+\epsilon_t,\quad \epsilon_t \stackrel{iid}\sim N(0,\sigma^2),
+$$
+for the given values: $\mu=10$, $\sigma^2=2$ and $\phi\in(-1,1)$. The code of the simulater can be seen in the Appendix. 
+
+From this point we are asked to generate 200 values of $x_t$. In Figure \ref{fig:a} it can be seen one simulation for $\phi=1$. The parameter $\phi$ determines how the current value of $x_t$ depends on the previous value. If $\phi>0$ then they are positively correlated, if $\phi<0$ they are negatively correlated and if $\phi=0$ they are not correlated at all. 
+
+```{r}
+################# QUESTION 1 ###################
+
+
+#### (a)
+
+# Given values
+mu = 10
+sigma2  = 2
+t = 200
+
+# AR simulator
+sim_AR_1 = function(start, mu, sigma2, phi, t){
+  x = numeric(t)
+  x[1] = start
+  for (i in 2:t) {
+    eps = rnorm(1, mean = 0, sd = sqrt(sigma2))
+    x[i] = mu + phi*(x[i-1] - mu) + eps
+  }
+  return(x)
+}
+```
+
+```{r, fig.cap="\\label{fig:a} AR(1)-process simulation", out.width = "90%", fig.pos='!h', fig.align='center'}
+
+# Plot of one simulation for phi=1
+set.seed(1234567890)
+x1 = sim_AR_1(mu, mu, sigma2, 1, t)
+plot(x2, type = 'l', main = "Simulation of Xt", xlab="Iteration", ylab="Xt")
+```
+
+
+### (b)
+
+Now we use the simulator from a) to simulate two AR(1)-processes with $\phi=0.3$ and $\phi=0.95$. Using this two simulations as synthetic data, we estimate $\mu$, $\phi$ and $\sigma^2$ using MCMC. The implemented Stan-code can be found in the appendix.   
+
+```{r}
+
+### (b)
+
+# Synthetic data
+set.seed(1234567890)
+x = sim_AR_1(mu, mu, sigma2, 0.3, t)
+y = sim_AR_1(mu, mu, sigma2, 0.95, t)
+
+# Stan model
+StanModel = '
+data {
+  int<lower=0> N;
+  vector[N] y;
+}
+parameters {
+  real mu;
+  real phi;
+  real<lower=0> sigma;
+}
+model {
+  mu ~ normal(10,2);
+  phi ~ normal(0.95,2); // Setting the limit of beta (or phi)
+  sigma ~ normal(1.4,2);
+  for (n in 2:N)
+    y[n] ~ normal(mu+phi*(y[n-1]-mu),sigma);
+}'
+```
+
+i. 
 
 
 
-### b
+### (c)
 
 
 
-### c
-
-
-
-### d
+### (d)
 
 
 
