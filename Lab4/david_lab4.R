@@ -46,7 +46,7 @@ plot(x3, type = 'l')
 # Seed
 set.seed(1234567890)
 x = sim_AR_1(mu, mu, sigma2, 0.3, t)
-y = sim_AR_1(mu, mu, sigma2, 0.95, t)
+y = sim_AR_1(mu+1, mu, 0, 0.5, t)
 
 plot(x, type = 'l')
 plot(y, type = 'l')
